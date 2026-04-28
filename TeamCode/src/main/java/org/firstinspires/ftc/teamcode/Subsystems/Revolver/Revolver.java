@@ -9,7 +9,6 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.Subsystems.Superstructure;
 import org.firstinspires.ftc.teamcode.wrappers.WActuatorGroup;
 import org.firstinspires.ftc.teamcode.wrappers.WEncoder;
@@ -35,6 +34,7 @@ public class Revolver extends WSubsystem {
     public static DigitalChannel leftSensor;
     public static DigitalChannel intakeSensor;
     private static boolean encoderReferenceSet = false;
+    private Boolean fullHoldGainsActive = null;
 
     @Override
     public void init(HardwareMap hardwareMap,boolean isAuto) {
@@ -48,6 +48,7 @@ public class Revolver extends WSubsystem {
                 .enableContinuousInput(180,-180);
         //RevolverController.setMaxPower(0.375);
         RevolverController.setMaxPower(1);
+        fullHoldGainsActive = null;
         if(isAuto || !encoderReferenceSet){
             RevolverEncoder.encoder.reset();
             encoderReferenceSet = true;
@@ -71,6 +72,7 @@ public class Revolver extends WSubsystem {
                 .enableContinuousInput(180,-180);
         //RevolverController.setMaxPower(0.375);
         RevolverController.setMaxPower(1);
+        fullHoldGainsActive = null;
         if(!encoderReferenceSet){
             RevolverEncoder.encoder.reset();
             encoderReferenceSet = true;
@@ -118,16 +120,25 @@ public class Revolver extends WSubsystem {
     }
     @Override
     public void periodic() {
-        if((Superstructure.slot0.IsthereBall()&&Superstructure.slot1.IsthereBall()&&Superstructure.slot2.IsthereBall())
-                &&!Superstructure.isIntakwing){
+        boolean fullHoldMode = (Superstructure.slot0.IsthereBall()&&Superstructure.slot1.IsthereBall()&&Superstructure.slot2.IsthereBall())
+                &&!Superstructure.isIntakwing;
+        applyGains(fullHoldMode);
+        RevolverController.periodic();
+    }
+
+    private void applyGains(boolean fullHoldMode) {
+        if (fullHoldGainsActive != null && fullHoldGainsActive == fullHoldMode) {
+            return;
+        }
+
+        if(fullHoldMode){
             RevolverController.setPID(0.015,0.01,0.00025);
             RevolverController.setFeedforward(WActuatorGroup.FeedforwardMode.CONSTANT, 0.033);
-
         }else{
             RevolverController.setPID(0.0065,0,0.00009);
             RevolverController.setFeedforward(WActuatorGroup.FeedforwardMode.CONSTANT, 0.034);
         }
-        RevolverController.periodic();
+        fullHoldGainsActive = fullHoldMode;
     }
 
     @Override
@@ -142,6 +153,9 @@ public class Revolver extends WSubsystem {
 
     @Override
     public void reset() {
-
+        if (RevolverController != null && RevolverEncoder != null) {
+            setRevolverAngle(getRevolverAngle().getDegrees());
+        }
+        fullHoldGainsActive = null;
     }
 }

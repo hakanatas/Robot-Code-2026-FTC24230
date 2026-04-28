@@ -136,14 +136,17 @@ public class redField extends OpMode {
 
         Superstructure.setVoltage(hardwareMap.voltageSensor.iterator().next().getVoltage());
 
-        Superstructure.isRevolverReady();
-
-        drawOnDashboard();
-
         if (gamepad1.options) {
             follower.setPose(new Pose(0, 0, 0));
             PoseStorage.reset();
         }
+
+        Superstructure.read();
+        Superstructure.periodic();
+        Superstructure.write();
+        Superstructure.isRevolverReady();
+
+        drawOnDashboard();
 
         // Telemetry
         telemetryM.debug("s0", Revolver.get0Status());
@@ -152,10 +155,6 @@ public class redField extends OpMode {
         telemetryM.debug("rv", Revolver.getRevolverAngle().getDegrees());
         telemetryM.debug("TY", Superstructure.vision.ty);
         telemetryM.update();
-
-        Superstructure.read();
-        Superstructure.periodic();
-        Superstructure.write();
     }
     private void drawOnDashboard() {
         try {

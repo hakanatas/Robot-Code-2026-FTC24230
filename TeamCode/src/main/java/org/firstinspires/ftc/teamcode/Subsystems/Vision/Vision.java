@@ -11,6 +11,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.lib.math.LinearFilter;
 import org.firstinspires.ftc.teamcode.wrappers.WSubsystem;
 
+import java.util.List;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -44,17 +46,21 @@ public class Vision extends WSubsystem {
     @Override
     public void read() {
         this.results=LL3.getLatestResult();
-        if(results!=null){
-            this.tx=results.getTx();
-            this.ty= results.getTy();
-            this.tv =results.isValid();
-            this.tl =results.getTargetingLatency()/100;
-            if(this.tv){
-                LLResultTypes.FiducialResult tag =results.getFiducialResults().get(0);
-                if(tag.getFiducialId()==20){
-                    Pose3D TargetPoseCamera =tag.getTargetPoseCameraSpace();
-                    TargetCamera = new Pose2d(new Translation2d(TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).x, TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).y),new Rotation2d(TargetPoseCamera.getOrientation().getYaw(AngleUnit.RADIANS)));
-                }
+        if (results == null) {
+            this.tv = false;
+            return;
+        }
+
+        this.tx=results.getTx();
+        this.ty= results.getTy();
+        this.tv =results.isValid();
+        this.tl =results.getTargetingLatency()/100;
+        List<LLResultTypes.FiducialResult> fiducials = results.getFiducialResults();
+        if(this.tv && fiducials != null && !fiducials.isEmpty()){
+            LLResultTypes.FiducialResult tag = fiducials.get(0);
+            if(tag.getFiducialId()==20){
+                Pose3D TargetPoseCamera =tag.getTargetPoseCameraSpace();
+                TargetCamera = new Pose2d(new Translation2d(TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).x, TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).y),new Rotation2d(TargetPoseCamera.getOrientation().getYaw(AngleUnit.RADIANS)));
             }
         }
     }

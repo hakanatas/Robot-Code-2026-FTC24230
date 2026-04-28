@@ -68,6 +68,12 @@ public class Flywheel extends WSubsystem {
 
     @Override
     public void reset() {
-
+        if (VelocityController != null) {
+            VelocityController.setTargetVelocity(0);
+        }
+        if (masterShooterMotor != null && slaveShooterMotor != null) {
+            masterShooterMotor.setPower(0);
+            slaveShooterMotor.setPower(0);
+        }
     }
 }

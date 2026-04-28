@@ -17,12 +17,8 @@ import org.firstinspires.ftc.teamcode.Subsystems.Vision.Vision;
 import org.firstinspires.ftc.teamcode.lib.Constants;
 import org.firstinspires.ftc.teamcode.lib.math.InterpolatingDouble;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.util.Util;
@@ -83,6 +79,8 @@ public class Superstructure{
     public static Slot currentSlot=slot0;
     private static final Timer intakeStartTimer = new Timer();
     private static final Timer intakeSensorTimer = new Timer();
+    private static final double REVOLVER_ANGLE_TOLERANCE = 5.0;
+    private static final double SLOT_ANGLE_TOLERANCE = 0.001;
     private static boolean intakeWasRunning = false;
 
     public static void init(HardwareMap hardwareMap) {
@@ -315,44 +313,9 @@ public class Superstructure{
 
     public static boolean isRevolverReady() {
         if(intake.getPower()==0){
-            if(slot0.IsthereBall()&& slot1.IsthereBall()&&slot2.IsthereBall()){
-                revAngle=slot0.getAngle();
-            }else {
-                if(slot0.IsthereBall()&& slot1.IsthereBall()){
-                    revAngle=slot0.getAngle();
-                } else if (slot0.IsthereBall()&& slot2.IsthereBall()) {
-                    revAngle=slot0.getAngle();
-                } else if (slot1.IsthereBall()&& slot2.IsthereBall()) {
-                    revAngle=slot1.getAngle();
-                }else{
-                    if(slot0.IsthereBall()){
-                        revAngle=slot0.getAngle();
-                    } else if (slot1.IsthereBall()) {
-                        revAngle=slot1.getAngle();
-                    }else if (slot2.IsthereBall()) {
-                        revAngle=slot2.getAngle();
-                    }else{
-                        revAngle=slot0.getAngle();
-                    }
-                }
-            }
-            if(Util.epsilonEquals(MathUtil.inputModulus(Revolver.getRevolverAngle().getDegrees(),-180,180), revAngle, 5)){
-                if(Revolver.RevolverController.getTargetPosition()==slot0.getAngle()){
-                    slot0.setIsthereBall(Revolver.get2Status());
-                    slot1.setIsthereBall(Revolver.get0Status());
-                    slot2.setIsthereBall(Revolver.get1Status());
-                    currentSlot=slot0;
-                } else if (Revolver.RevolverController.getTargetPosition()== slot1.getAngle()) {
-                    slot0.setIsthereBall(Revolver.get1Status());
-                    slot1.setIsthereBall(Revolver.get2Status());
-                    slot2.setIsthereBall(Revolver.get0Status());
-                    currentSlot=slot1;
-                }else if (Revolver.RevolverController.getTargetPosition()==slot2.getAngle()) {
-                    slot0.setIsthereBall(Revolver.get0Status());
-                    slot1.setIsthereBall(Revolver.get1Status());
-                    slot2.setIsthereBall(Revolver.get2Status());
-                    currentSlot=slot2;
-                }
+            revAngle = selectHoldAngle();
+            if(revolverAtAngle(revAngle)){
+                updateSlotsFromIndexedSensors(revAngle);
             }
         }else{
             if (intakeStartTimer.get() < intakeRevolverStartDelay) {
@@ -362,39 +325,102 @@ public class Superstructure{
 
             boolean intakeConfirmed = isIntakeSensorConfirmed();
 
-            if((slot0.IsthereBall()&& slot1.IsthereBall()&&slot2.IsthereBall())){
-                revAngle=slot0.getAngle();
-            }else {
-                if((slot0.IsthereBall()&& slot1.IsthereBall())){
-                    revAngle=Rotation2d.fromDegrees(slot2.getAngle()+180).getDegrees();
-                } else if (slot0.IsthereBall()&& slot2.IsthereBall()) {
-                    revAngle=Rotation2d.fromDegrees(slot1.getAngle()-180).getDegrees();
-                } else if (slot1.IsthereBall()&& slot2.IsthereBall()) {
-                    revAngle=Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
-                }else{
-                    if(slot0.IsthereBall()){
-                        revAngle=Rotation2d.fromDegrees(slot1.getAngle()-180).getDegrees();
-                    } else if (slot1.IsthereBall()) {
-                        revAngle=Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
-                    }else if (slot2.IsthereBall()) {
-                        revAngle=Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
-                    }else{
-                        revAngle=Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
-                    }
-                }
-            }
-            if(Util.epsilonEquals(MathUtil.inputModulus(Revolver.getRevolverAngle().getDegrees(),-180,180) , revAngle, 5)){
-                if(revAngle==Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees()){
-                    slot0.setIsthereBall(intakeConfirmed);
-                } else if (revAngle== Rotation2d.fromDegrees(slot1.getAngle()-180).getDegrees()) {
-                    slot1.setIsthereBall(intakeConfirmed);
-                }else if (revAngle==Rotation2d.fromDegrees(slot2.getAngle()+180).getDegrees()) {
-                    slot2.setIsthereBall(intakeConfirmed);
-                }
+            revAngle = selectIntakeAngle();
+            if(revolverAtAngle(revAngle)){
+                updateIntakeSlotState(revAngle, intakeConfirmed);
             }
         }
         Revolver.setRevolverAngle(revAngle);
         return currentSlot.IsthereBall();
+    }
+
+    private static double selectHoldAngle() {
+        if(slot0.IsthereBall()&& slot1.IsthereBall()&&slot2.IsthereBall()){
+            return slot0.getAngle();
+        }else {
+            if(slot0.IsthereBall()&& slot1.IsthereBall()){
+                return slot0.getAngle();
+            } else if (slot0.IsthereBall()&& slot2.IsthereBall()) {
+                return slot0.getAngle();
+            } else if (slot1.IsthereBall()&& slot2.IsthereBall()) {
+                return slot1.getAngle();
+            }else{
+                if(slot0.IsthereBall()){
+                    return slot0.getAngle();
+                } else if (slot1.IsthereBall()) {
+                    return slot1.getAngle();
+                }else if (slot2.IsthereBall()) {
+                    return slot2.getAngle();
+                }else{
+                    return slot0.getAngle();
+                }
+            }
+        }
+    }
+
+    private static double selectIntakeAngle() {
+        if((slot0.IsthereBall()&& slot1.IsthereBall()&&slot2.IsthereBall())){
+            return slot0.getAngle();
+        }else {
+            if((slot0.IsthereBall()&& slot1.IsthereBall())){
+                return Rotation2d.fromDegrees(slot2.getAngle()+180).getDegrees();
+            } else if (slot0.IsthereBall()&& slot2.IsthereBall()) {
+                return Rotation2d.fromDegrees(slot1.getAngle()-180).getDegrees();
+            } else if (slot1.IsthereBall()&& slot2.IsthereBall()) {
+                return Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
+            }else{
+                if(slot0.IsthereBall()){
+                    return Rotation2d.fromDegrees(slot1.getAngle()-180).getDegrees();
+                } else if (slot1.IsthereBall()) {
+                    return Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
+                }else if (slot2.IsthereBall()) {
+                    return Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
+                }else{
+                    return Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees();
+                }
+            }
+        }
+    }
+
+    private static void updateSlotsFromIndexedSensors(double targetAngle) {
+        if(angleMatches(targetAngle, slot0.getAngle())){
+            slot0.setIsthereBall(Revolver.get2Status());
+            slot1.setIsthereBall(Revolver.get0Status());
+            slot2.setIsthereBall(Revolver.get1Status());
+            currentSlot=slot0;
+        } else if (angleMatches(targetAngle, slot1.getAngle())) {
+            slot0.setIsthereBall(Revolver.get1Status());
+            slot1.setIsthereBall(Revolver.get2Status());
+            slot2.setIsthereBall(Revolver.get0Status());
+            currentSlot=slot1;
+        }else if (angleMatches(targetAngle, slot2.getAngle())) {
+            slot0.setIsthereBall(Revolver.get0Status());
+            slot1.setIsthereBall(Revolver.get1Status());
+            slot2.setIsthereBall(Revolver.get2Status());
+            currentSlot=slot2;
+        }
+    }
+
+    private static void updateIntakeSlotState(double targetAngle, boolean intakeConfirmed) {
+        if(angleMatches(targetAngle, Rotation2d.fromDegrees(slot0.getAngle()+180).getDegrees())){
+            slot0.setIsthereBall(intakeConfirmed);
+        } else if (angleMatches(targetAngle, Rotation2d.fromDegrees(slot1.getAngle()-180).getDegrees())) {
+            slot1.setIsthereBall(intakeConfirmed);
+        }else if (angleMatches(targetAngle, Rotation2d.fromDegrees(slot2.getAngle()+180).getDegrees())) {
+            slot2.setIsthereBall(intakeConfirmed);
+        }
+    }
+
+    private static boolean revolverAtAngle(double targetAngle) {
+        return Math.abs(MathUtil.inputModulus(
+                MathUtil.inputModulus(Revolver.getRevolverAngle().getDegrees(),-180,180) - targetAngle,
+                -180,
+                180
+        )) <= REVOLVER_ANGLE_TOLERANCE;
+    }
+
+    private static boolean angleMatches(double angle, double targetAngle) {
+        return Math.abs(MathUtil.inputModulus(angle - targetAngle, -180, 180)) <= SLOT_ANGLE_TOLERANCE;
     }
 
     private static boolean isIntakeSensorConfirmed() {
@@ -476,7 +502,17 @@ public class Superstructure{
         isIntakwing = false;
         isTilted = false;
         manualMode = false;
+        resetSlotState();
+        revAngle = MathUtil.inputModulus(Revolver.getRevolverAngle().getDegrees(), -180, 180);
+        Revolver.setRevolverAngle(revAngle);
         resetIntakeTimers();
+    }
+
+    private static void resetSlotState() {
+        slot0.setIsthereBall(false);
+        slot1.setIsthereBall(false);
+        slot2.setIsthereBall(false);
+        currentSlot = slot0;
     }
 
     private static void resetIntakeTimers() {

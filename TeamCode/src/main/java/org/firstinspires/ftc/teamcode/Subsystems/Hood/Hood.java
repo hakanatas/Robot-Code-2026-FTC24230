@@ -60,6 +60,8 @@ public class Hood extends WSubsystem {
 
     @Override
     public void reset() {
-
+        if (axonController != null) {
+            setHoodAngle(0.2);
+        }
     }
 }

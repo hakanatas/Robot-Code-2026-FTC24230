@@ -86,6 +86,8 @@ public class Turret extends WSubsystem {
 
     @Override
     public void reset() {
-
+        if (TurretController != null) {
+            setTurretAngle(0);
+        }
     }
 }

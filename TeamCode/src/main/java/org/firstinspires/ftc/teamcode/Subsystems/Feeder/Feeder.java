@@ -40,5 +40,9 @@ public class Feeder extends WSubsystem {
     public void write() {}
 
     @Override
-    public void reset() {}
+    public void reset() {
+        if (lFeederMotor != null) {
+            setFeedersMotor(0);
+        }
+    }
 }

@@ -140,9 +140,6 @@ public class blueField extends OpMode {
         }
 
         Superstructure.angularvel=follower.getAngularVelocity();
-        Superstructure.isRevolverReady();
-
-        drawOnDashboard();
 
         if (gamepad1.options) {
             follower.setPose(new Pose(0, 0, 0));
@@ -150,6 +147,12 @@ public class blueField extends OpMode {
         }
 
         Superstructure.setVoltage(hardwareMap.voltageSensor.iterator().next().getVoltage());
+        Superstructure.read();
+        Superstructure.periodic();
+        Superstructure.write();
+        Superstructure.isRevolverReady();
+
+        drawOnDashboard();
 
         /*
  Telemetry
@@ -175,10 +178,6 @@ public class blueField extends OpMode {
         telemetryM.debug("rv", Revolver.getRevolverAngle().getDegrees());
 
         telemetryM.update();
-
-        Superstructure.read();
-        Superstructure.periodic();
-        Superstructure.write();
     }
     private void drawOnDashboard() {
         try {

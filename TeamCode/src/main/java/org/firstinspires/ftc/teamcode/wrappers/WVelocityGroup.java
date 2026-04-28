@@ -58,8 +58,8 @@ public class WVelocityGroup {
     private double maxPowerChangePerSec = Double.POSITIVE_INFINITY;
     private double maxPower = 1.0;
 
-    // optional voltage value (for correction)
-    private double voltage = 12.0;
+    // Optional fixed voltage; NaN means use the live supplier.
+    private double voltage = Double.NaN;
 
     public WVelocityGroup(HardwareDevice... devices) {
         this(null, devices);
@@ -119,7 +119,7 @@ public class WVelocityGroup {
         switch (ffMode) {
             case SIMPLE:
                 double sign = Math.signum(targetVelocity);
-                ff = kS * (sign == 0 ? 1.0 : sign) + kV * targetVelocity + kA * acceleration;
+                ff = sign == 0 ? 0.0 : kS * sign + kV * targetVelocity + kA * acceleration;
                 break;
             case CONSTANT:
                 ff = constantFF;
@@ -129,8 +129,7 @@ public class WVelocityGroup {
         }
 
         double volts = ff + pidOutput;
-        double battery = voltage != 0 ? voltage : voltageSupplier.getAsDouble();
-        double desiredPower = volts / Math.max(0.0001, battery);
+        double desiredPower = volts / getBatteryVoltage();
 
         desiredPower = Math.max(-1.0, Math.min(1.0, desiredPower));
 
@@ -157,12 +156,8 @@ public class WVelocityGroup {
         for (HardwareDevice device : devices.values()) {
             if (device instanceof DcMotor) {
                 DcMotor m = (DcMotor) device;
-                double correction = 1.0;
-                double batt = voltage != 0 ? voltage : voltageSupplier.getAsDouble();
-                if (batt != 0) correction = 12.0 / batt;
-
                 if (!floating && enabled)
-                    m.setPower((power * maxPower) * correction);
+                    m.setPower(power * maxPower);
                 else
                     m.setPower(0.0);
             }
@@ -214,6 +209,7 @@ public class WVelocityGroup {
 
     public WVelocityGroup setVoltageSupplier(DoubleSupplier supplier) {
         this.voltageSupplier = supplier;
+        this.voltage = Double.NaN;
         return this;
     }
 
@@ -250,4 +246,12 @@ public class WVelocityGroup {
     public double getPower() { return power; }
     public List<HardwareDevice> getDevices() { return new ArrayList<>(devices.values()); }
     public HardwareDevice getDevice(String name) { return devices.get(name); }
+
+    private double getBatteryVoltage() {
+        double battery = Double.isNaN(voltage) ? voltageSupplier.getAsDouble() : voltage;
+        if (Double.isNaN(battery) || Double.isInfinite(battery) || Math.abs(battery) < 0.0001) {
+            return 12.0;
+        }
+        return Math.abs(battery);
+    }
 }
