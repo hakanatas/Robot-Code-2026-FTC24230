@@ -23,6 +23,10 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 @TeleOp(name = "redSaha")
 public class redField extends OpMode {
     private static final double ROBOT_RADIUS = 9;
+    private static final double FAST_TRANSLATION_SPEED = 0.95;
+    private static final double SLOW_TRANSLATION_SPEED = 0.55;
+    private static final double FAST_TURN_SPEED = 0.50;
+    private static final double SLOW_TURN_SPEED = 0.35;
     private Follower follower;
     private TelemetryManager telemetryM;
     private FieldManager panelsField;
@@ -84,10 +88,13 @@ public class redField extends OpMode {
     public void loop() {
         follower.update();
 
+        double translationSpeed = gamepad1.left_bumper ? SLOW_TRANSLATION_SPEED : FAST_TRANSLATION_SPEED;
+        double turnSpeed = gamepad1.left_bumper ? SLOW_TURN_SPEED : FAST_TURN_SPEED;
+
         follower.setTeleOpDrive(
-                0.85 * -gamepad1.left_stick_y,
-                0.85 * -gamepad1.left_stick_x,
-                0.5 * -gamepad1.right_stick_x,
+                translationSpeed * -gamepad1.left_stick_y,
+                translationSpeed * -gamepad1.left_stick_x,
+                turnSpeed * -gamepad1.right_stick_x,
                 false
         );
 
