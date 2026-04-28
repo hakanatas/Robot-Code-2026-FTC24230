@@ -26,9 +26,9 @@ public class blueField extends OpMode {
     static FtcDashboard dashboard;
     private static final double ROBOT_RADIUS = 9;
     private static final double FAST_TRANSLATION_SPEED = 0.95;
-    private static final double SLOW_TRANSLATION_SPEED = 0.55;
+    private static final double SLOW_TRANSLATION_SPEED = 0.35;
     private static final double FAST_TURN_SPEED = 0.50;
-    private static final double SLOW_TURN_SPEED = 0.35;
+    private static final double SLOW_TURN_SPEED = 0.25;
     private Follower follower;
     private TelemetryManager telemetryM;
     private FieldManager panelsField;
@@ -90,8 +90,6 @@ public class blueField extends OpMode {
 
     @Override
     public void loop() {
-        follower.update();
-
         double translationSpeed = gamepad1.left_bumper ? SLOW_TRANSLATION_SPEED : FAST_TRANSLATION_SPEED;
         double turnSpeed = gamepad1.left_bumper ? SLOW_TURN_SPEED : FAST_TURN_SPEED;
 
@@ -101,6 +99,8 @@ public class blueField extends OpMode {
                 turnSpeed * -gamepad1.right_stick_x,
                 false
         );
+
+        follower.update();
 
         if(gamepad1.right_trigger>0.5){
             Superstructure.isIntakwing=true;
@@ -183,6 +183,7 @@ public class blueField extends OpMode {
         telemetryM.debug("s2", Revolver.get2Status());
 
         telemetryM.debug("rv", Revolver.getRevolverAngle().getDegrees());
+        telemetryM.debug("driveMode", gamepad1.left_bumper ? "SLOW" : "FAST");
 
         telemetryM.update();
     }
