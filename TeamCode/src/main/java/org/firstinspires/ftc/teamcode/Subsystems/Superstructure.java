@@ -21,7 +21,6 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.util.Util;
 import edu.wpi.first.wpilibj.Timer;
 @Config
 public class Superstructure{
@@ -70,6 +69,8 @@ public class Superstructure{
     public static boolean corrected = true;
     public static double intakeRevolverStartDelay = 0.25;
     public static double intakeSensorConfirmTime = 0.08;
+    public static double shotVisionGraceTime = 0.30;
+    public static double turretShotToleranceDegrees = 4.0;
 
     public static boolean isauto = false;
     public static double angularvel = 0;
@@ -80,9 +81,11 @@ public class Superstructure{
     public static Slot currentSlot=slot0;
     private static final Timer intakeStartTimer = new Timer();
     private static final Timer intakeSensorTimer = new Timer();
+    private static final Timer shotVisionMissingTimer = new Timer();
     private static final double REVOLVER_ANGLE_TOLERANCE = 5.0;
     private static final double SLOT_ANGLE_TOLERANCE = 0.001;
     private static boolean intakeWasRunning = false;
+    private static boolean visionReadyForShot = false;
 
     public static void init(HardwareMap hardwareMap) {
         revolver.init(hardwareMap, isauto);
@@ -102,6 +105,7 @@ public class Superstructure{
         flywheelIdleMode = true;
         corrected = true;
         resetIntakeTimers();
+        resetShotReadiness();
     }
 
     public static void periodic() {
@@ -162,13 +166,14 @@ public class Superstructure{
 //            turret.setTurretAngle(0);
 //        }
 
+        updateShotVisionReady();
         isRevolverReady();
 
         boolean revolverEmpty=!slot0.IsthereBall()&&!slot2.IsthereBall()&&!slot1.IsthereBall();
         boolean revolverFull=slot0.IsthereBall()&&slot2.IsthereBall()&&slot1.IsthereBall();
 
         if(isShooting){
-            if(flywheel.IsAtSetpoint() && hood.IsAtSetpoint() && vision.tv && Util.epsilonEquals(turret.getTurretAngle(),turret.TurretController.getTargetPosition(), 3)&&!revolverEmpty){
+            if(isShotReady()&&!revolverEmpty){
                 LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
             }else if(revolverEmpty){
                 LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.STROBE_RED);
@@ -440,13 +445,14 @@ public class Superstructure{
 
     public static void setShootSystem(){
         isShooting = true;
+        updateShotVisionReady();
         if(!manualMode){
             flywheel.setSetpointRPM(Constants.ShootingParams.kRPMMap.getInterpolated(new InterpolatingDouble(Superstructure.vision.ty)).value);
         }else{
             flywheel.setSetpointRPM(3500);
         }
 //        flywheel.setSetpointRPM(RPM);
-        if(flywheel.IsAtSetpoint() && hood.IsAtSetpoint() && vision.tv && Util.epsilonEquals(turret.getTurretAngle(),turret.TurretController.getTargetPosition(), 3)){
+        if(isShotReady()){
             feeder.setFeedersMotor(1);
         }else{
             feeder.setFeedersMotor(0);
@@ -461,6 +467,26 @@ public class Superstructure{
 
     public static boolean isShooting() {
         return isShooting;
+    }
+
+    public static boolean isShotReady() {
+        return flywheel.IsAtSetpoint()
+                && hood.IsAtSetpoint()
+                && isVisionReadyForShot()
+                && isTurretReadyForShot();
+    }
+
+    public static boolean isVisionReadyForShot() {
+        return vision.tv || visionReadyForShot;
+    }
+
+    public static boolean isTurretReadyForShot() {
+        double turretError = MathUtil.inputModulus(
+                turret.getTurretAngle() - turret.TurretController.getTargetPosition(),
+                -180,
+                180
+        );
+        return Math.abs(turretError) <= turretShotToleranceDegrees;
     }
 
     public static void setFlywheelIdleMode(boolean enabled) {
@@ -514,6 +540,7 @@ public class Superstructure{
         revAngle = MathUtil.inputModulus(Revolver.getRevolverAngle().getDegrees(), -180, 180);
         Revolver.setRevolverAngle(revAngle);
         resetIntakeTimers();
+        resetShotReadiness();
     }
 
     private static void resetSlotState() {
@@ -529,5 +556,33 @@ public class Superstructure{
         intakeStartTimer.stop();
         intakeSensorTimer.reset();
         intakeSensorTimer.stop();
+    }
+
+    private static void updateShotVisionReady() {
+        if (shotVisionGraceTime <= 0) {
+            visionReadyForShot = vision.tv;
+            shotVisionMissingTimer.reset();
+            shotVisionMissingTimer.stop();
+            return;
+        }
+
+        if (vision.tv) {
+            visionReadyForShot = true;
+            shotVisionMissingTimer.reset();
+            shotVisionMissingTimer.stop();
+        } else if (visionReadyForShot) {
+            shotVisionMissingTimer.start();
+            if (shotVisionMissingTimer.get() > shotVisionGraceTime) {
+                visionReadyForShot = false;
+                shotVisionMissingTimer.reset();
+                shotVisionMissingTimer.stop();
+            }
+        }
+    }
+
+    private static void resetShotReadiness() {
+        visionReadyForShot = false;
+        shotVisionMissingTimer.reset();
+        shotVisionMissingTimer.stop();
     }
 }

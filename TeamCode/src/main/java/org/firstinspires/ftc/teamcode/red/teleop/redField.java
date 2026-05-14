@@ -199,10 +199,10 @@ public class redField extends OpMode {
     private void addThroughputTelemetry() {
         double turretAngle = Superstructure.turret.getTurretAngle();
         double turretTarget = Superstructure.turret.TurretController.getTargetPosition();
-        boolean turretReady = Math.abs(turretAngle - turretTarget) <= 3.0;
+        boolean turretReady = Superstructure.isTurretReadyForShot();
         boolean flywheelReady = Superstructure.flywheel.IsAtSetpoint();
         boolean hoodReady = Superstructure.hood.IsAtSetpoint();
-        boolean visionReady = Superstructure.vision.tv;
+        boolean visionReady = Superstructure.isVisionReadyForShot();
         boolean revolverEmpty = !Superstructure.slot0.IsthereBall()
                 && !Superstructure.slot1.IsthereBall()
                 && !Superstructure.slot2.IsthereBall();
@@ -213,9 +213,10 @@ public class redField extends OpMode {
                 Superstructure.flywheel.getTargetRPM());
         telemetry.addData("ready F/H/T/V", "%s/%s/%s/%s",
                 flywheelReady, hoodReady, turretReady, visionReady);
+        telemetry.addData("vision raw/shot", "%s/%s", Superstructure.vision.tv, visionReady);
         telemetry.addData("turret", "%.1f -> %.1f", turretAngle, turretTarget);
         telemetry.addData("hood", "%.1f", Superstructure.hood.getHoodAngle());
-        telemetry.addData("feeder gate", flywheelReady && hoodReady && turretReady && visionReady);
+        telemetry.addData("feeder gate", Superstructure.isShotReady());
         telemetry.addData("intake power", "%.1f", Superstructure.intake.getPower());
         telemetry.addData("intake sensor", Revolver.getIntakeStatus());
         telemetry.addData("slots 0/1/2", "%s/%s/%s",
