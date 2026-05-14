@@ -14,12 +14,14 @@ import org.firstinspires.ftc.teamcode.wrappers.WVelocityGroup;
 
 import java.util.function.DoubleSupplier;
 
-import edu.wpi.first.util.Util;
 @Config
 public class Flywheel extends WSubsystem {
     public static double ks=0;
     public static double kv=0;
     public static double kp=0;
+    public static double readyToleranceRPM = 150.0;
+    public static double farReadyToleranceRPM = 75.0;
+    public static double farShotRPMThreshold = 3900.0;
     DcMotorEx masterShooterMotor;
     DcMotorEx slaveShooterMotor;
      WVelocityGroup VelocityController;
@@ -38,13 +40,18 @@ public class Flywheel extends WSubsystem {
                 .setFeedforwardSimple(0.00037,0.0025,0.0);
     }
     public boolean IsAtSetpoint(){
-        return Util.epsilonEquals(getShooterRPM(),VelocityController.getTargetVelocity(),100);
+        double targetRPM = VelocityController.getTargetVelocity();
+        double toleranceRPM = targetRPM >= farShotRPMThreshold ? farReadyToleranceRPM : readyToleranceRPM;
+        return getShooterRPM() >= targetRPM - toleranceRPM;
     }
     public void setSetpointRPM(double rpm){
         VelocityController.setTargetVelocity(rpm);
     }
     public double getShooterRPM(){
         return VelocityController.getVelocity();
+    }
+    public double getTargetRPM(){
+        return VelocityController.getTargetVelocity();
     }
     @Override
     public void periodic() {

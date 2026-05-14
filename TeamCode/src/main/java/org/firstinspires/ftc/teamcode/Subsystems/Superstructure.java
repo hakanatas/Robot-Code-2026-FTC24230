@@ -61,7 +61,8 @@ public class Superstructure{
 
     public static boolean manualTurretControl = false;
     public static boolean flywheelIdleMode = true;
-    public static double flywheelIdleRPM = 2800.0;
+    public static double flywheelIdleRPM = 3700.0;
+    public static double hoodShotAngleOffset = 1.5;
     private static boolean isShooting = false;
     public static boolean isIntakwing = false;
     public static boolean isTilted = false;
@@ -106,7 +107,7 @@ public class Superstructure{
     public static void periodic() {
 //        visionpid.setPID(kp,ki,kd);
         if(!manualMode&&!manualHoodControl){
-            hood.setHoodAngle(Constants.ShootingParams.kHoodMap.getInterpolated(new InterpolatingDouble(Superstructure.vision.ty)).value);
+            hood.setHoodAngle(Constants.ShootingParams.kHoodMap.getInterpolated(new InterpolatingDouble(Superstructure.vision.ty)).value + hoodShotAngleOffset);
 //            hood.setHoodAngle(ANGLE);
         }else if(manualMode&&!manualTurretControl){
             hood.setHoodAngle(18);
@@ -161,6 +162,8 @@ public class Superstructure{
 //            turret.setTurretAngle(0);
 //        }
 
+        isRevolverReady();
+
         boolean revolverEmpty=!slot0.IsthereBall()&&!slot2.IsthereBall()&&!slot1.IsthereBall();
         boolean revolverFull=slot0.IsthereBall()&&slot2.IsthereBall()&&slot1.IsthereBall();
 
@@ -185,9 +188,9 @@ public class Superstructure{
             }
         }else if(isIntakwing){
             if(!revolverFull){
-                LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.CP1_STROBE);
+                LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.ORANGE);
             }else{
-                LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.CP2_STROBE);
+                LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.VIOLET);
             }
         }else if(isTilted){
             LEDS.setPattern(RevBlinkinLedDriver.BlinkinPattern.FIRE_MEDIUM);
@@ -316,6 +319,7 @@ public class Superstructure{
             revAngle = selectHoldAngle();
             if(revolverAtAngle(revAngle)){
                 updateSlotsFromIndexedSensors(revAngle);
+                revAngle = selectHoldAngle();
             }
         }else{
             if (intakeStartTimer.get() < intakeRevolverStartDelay) {
@@ -453,6 +457,10 @@ public class Superstructure{
         isShooting = false;
         autoWiggle = false;
         feeder.setFeedersMotor(0);
+    }
+
+    public static boolean isShooting() {
+        return isShooting;
     }
 
     public static void setFlywheelIdleMode(boolean enabled) {

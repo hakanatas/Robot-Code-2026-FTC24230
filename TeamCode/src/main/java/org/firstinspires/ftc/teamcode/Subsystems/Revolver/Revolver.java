@@ -25,6 +25,14 @@ public class Revolver extends WSubsystem {
     public static double ki = 0.0;
     public static double kd = 0.0;
     public static double kff = 0.0;
+    public static double normalKp = 0.0065;
+    public static double normalKi = 0.0;
+    public static double normalKd = 0.00009;
+    public static double normalFeedforward = 0.034;
+    public static double aggressiveKp = 0.015;
+    public static double aggressiveKi = 0.01;
+    public static double aggressiveKd = 0.00025;
+    public static double aggressiveFeedforward = 0.033;
     DcMotorEx revolverMotor;
     static WEncoder RevolverEncoder;
     public static WActuatorGroup RevolverController;
@@ -34,7 +42,7 @@ public class Revolver extends WSubsystem {
     public static DigitalChannel leftSensor;
     public static DigitalChannel intakeSensor;
     private static boolean encoderReferenceSet = false;
-    private Boolean fullHoldGainsActive = null;
+    private Boolean aggressiveGainsActive = null;
 
     @Override
     public void init(HardwareMap hardwareMap,boolean isAuto) {
@@ -48,7 +56,7 @@ public class Revolver extends WSubsystem {
                 .enableContinuousInput(180,-180);
         //RevolverController.setMaxPower(0.375);
         RevolverController.setMaxPower(1);
-        fullHoldGainsActive = null;
+        aggressiveGainsActive = null;
         if(isAuto || !encoderReferenceSet){
             RevolverEncoder.encoder.reset();
             encoderReferenceSet = true;
@@ -72,7 +80,7 @@ public class Revolver extends WSubsystem {
                 .enableContinuousInput(180,-180);
         //RevolverController.setMaxPower(0.375);
         RevolverController.setMaxPower(1);
-        fullHoldGainsActive = null;
+        aggressiveGainsActive = null;
         if(!encoderReferenceSet){
             RevolverEncoder.encoder.reset();
             encoderReferenceSet = true;
@@ -122,23 +130,24 @@ public class Revolver extends WSubsystem {
     public void periodic() {
         boolean fullHoldMode = (Superstructure.slot0.IsthereBall()&&Superstructure.slot1.IsthereBall()&&Superstructure.slot2.IsthereBall())
                 &&!Superstructure.isIntakwing;
-        applyGains(fullHoldMode);
+        boolean aggressiveMode = fullHoldMode || Superstructure.isShooting();
+        applyGains(aggressiveMode);
         RevolverController.periodic();
     }
 
-    private void applyGains(boolean fullHoldMode) {
-        if (fullHoldGainsActive != null && fullHoldGainsActive == fullHoldMode) {
+    private void applyGains(boolean aggressiveMode) {
+        if (aggressiveGainsActive != null && aggressiveGainsActive == aggressiveMode) {
             return;
         }
 
-        if(fullHoldMode){
-            RevolverController.setPID(0.015,0.01,0.00025);
-            RevolverController.setFeedforward(WActuatorGroup.FeedforwardMode.CONSTANT, 0.033);
+        if(aggressiveMode){
+            RevolverController.setPID(aggressiveKp,aggressiveKi,aggressiveKd);
+            RevolverController.setFeedforward(WActuatorGroup.FeedforwardMode.CONSTANT, aggressiveFeedforward);
         }else{
-            RevolverController.setPID(0.0065,0,0.00009);
-            RevolverController.setFeedforward(WActuatorGroup.FeedforwardMode.CONSTANT, 0.034);
+            RevolverController.setPID(normalKp,normalKi,normalKd);
+            RevolverController.setFeedforward(WActuatorGroup.FeedforwardMode.CONSTANT, normalFeedforward);
         }
-        fullHoldGainsActive = fullHoldMode;
+        aggressiveGainsActive = aggressiveMode;
     }
 
     @Override
@@ -156,6 +165,6 @@ public class Revolver extends WSubsystem {
         if (RevolverController != null && RevolverEncoder != null) {
             setRevolverAngle(getRevolverAngle().getDegrees());
         }
-        fullHoldGainsActive = null;
+        aggressiveGainsActive = null;
     }
 }

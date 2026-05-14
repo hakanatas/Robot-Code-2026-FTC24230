@@ -23,10 +23,10 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 @TeleOp(name = "redSaha")
 public class redField extends OpMode {
     private static final double ROBOT_RADIUS = 9;
-    private static final double FAST_TRANSLATION_SPEED = 0.95;
-    private static final double SLOW_TRANSLATION_SPEED = 0.35;
-    private static final double FAST_TURN_SPEED = 0.50;
-    private static final double SLOW_TURN_SPEED = 0.25;
+    private static final double FAST_TRANSLATION_SPEED = 1.0;
+    private static final double SLOW_TRANSLATION_SPEED = 0.65;
+    private static final double FAST_TURN_SPEED = 0.60;
+    private static final double SLOW_TURN_SPEED = 0.35;
     private Follower follower;
     private TelemetryManager telemetryM;
     private FieldManager panelsField;
@@ -88,11 +88,14 @@ public class redField extends OpMode {
     public void loop() {
         double translationSpeed = gamepad1.left_bumper ? SLOW_TRANSLATION_SPEED : FAST_TRANSLATION_SPEED;
         double turnSpeed = gamepad1.left_bumper ? SLOW_TURN_SPEED : FAST_TURN_SPEED;
+        double forwardCommand = translationSpeed * -gamepad1.left_stick_y;
+        double strafeCommand = translationSpeed * -gamepad1.left_stick_x;
+        double turnCommand = turnSpeed * -gamepad1.right_stick_x;
 
         follower.setTeleOpDrive(
-                translationSpeed * -gamepad1.left_stick_y,
-                translationSpeed * -gamepad1.left_stick_x,
-                turnSpeed * -gamepad1.right_stick_x,
+                forwardCommand,
+                strafeCommand,
+                turnCommand,
                 false
         );
 
@@ -141,7 +144,8 @@ public class redField extends OpMode {
             Superstructure.isTilted=false;
         }
 
-        Superstructure.setVoltage(hardwareMap.voltageSensor.iterator().next().getVoltage());
+        double batteryVoltage = hardwareMap.voltageSensor.iterator().next().getVoltage();
+        Superstructure.setVoltage(batteryVoltage);
 
         if (gamepad1.options) {
             follower.setPose(new Pose(0, 0, 0));
@@ -163,7 +167,67 @@ public class redField extends OpMode {
         telemetryM.debug("TY", Superstructure.vision.ty);
         telemetryM.debug("driveMode", gamepad1.left_bumper ? "SLOW" : "FAST");
         telemetryM.update();
+        updateDriverStationTelemetry(translationSpeed, turnSpeed, forwardCommand, strafeCommand, turnCommand, batteryVoltage);
     }
+
+    private void updateDriverStationTelemetry(double translationSpeed, double turnSpeed,
+                                              double forwardCommand, double strafeCommand,
+                                              double turnCommand, double batteryVoltage) {
+        Pose pose = follower.getPose();
+
+        telemetry.addData("opMode", "redSaha");
+        telemetry.addData("driveMode", gamepad1.left_bumper ? "SLOW" : "FAST");
+        telemetry.addData("driveFrame", "FIELD");
+        telemetry.addData("translationSpeed", "%.2f", translationSpeed);
+        telemetry.addData("turnSpeed", "%.2f", turnSpeed);
+        telemetry.addData("leftBumper", gamepad1.left_bumper);
+        telemetry.addData("left_y raw", "%.2f", gamepad1.left_stick_y);
+        telemetry.addData("left_x raw", "%.2f", gamepad1.left_stick_x);
+        telemetry.addData("right_x raw", "%.2f", gamepad1.right_stick_x);
+        telemetry.addData("forward cmd", "%.2f", forwardCommand);
+        telemetry.addData("strafe cmd", "%.2f", strafeCommand);
+        telemetry.addData("turn cmd", "%.2f", turnCommand);
+        telemetry.addData("battery", "%.2f V", batteryVoltage);
+        if (pose != null) {
+            telemetry.addData("pose", "x %.1f y %.1f h %.1f",
+                    pose.getX(), pose.getY(), Math.toDegrees(pose.getHeading()));
+        }
+        addThroughputTelemetry();
+        telemetry.update();
+    }
+
+    private void addThroughputTelemetry() {
+        double turretAngle = Superstructure.turret.getTurretAngle();
+        double turretTarget = Superstructure.turret.TurretController.getTargetPosition();
+        boolean turretReady = Math.abs(turretAngle - turretTarget) <= 3.0;
+        boolean flywheelReady = Superstructure.flywheel.IsAtSetpoint();
+        boolean hoodReady = Superstructure.hood.IsAtSetpoint();
+        boolean visionReady = Superstructure.vision.tv;
+        boolean revolverEmpty = !Superstructure.slot0.IsthereBall()
+                && !Superstructure.slot1.IsthereBall()
+                && !Superstructure.slot2.IsthereBall();
+
+        telemetry.addData("shoot req", gamepad1.right_bumper);
+        telemetry.addData("flywheel", "%.0f / %.0f rpm",
+                Superstructure.flywheel.getShooterRPM(),
+                Superstructure.flywheel.getTargetRPM());
+        telemetry.addData("ready F/H/T/V", "%s/%s/%s/%s",
+                flywheelReady, hoodReady, turretReady, visionReady);
+        telemetry.addData("turret", "%.1f -> %.1f", turretAngle, turretTarget);
+        telemetry.addData("hood", "%.1f", Superstructure.hood.getHoodAngle());
+        telemetry.addData("feeder gate", flywheelReady && hoodReady && turretReady && visionReady);
+        telemetry.addData("intake power", "%.1f", Superstructure.intake.getPower());
+        telemetry.addData("intake sensor", Revolver.getIntakeStatus());
+        telemetry.addData("slots 0/1/2", "%s/%s/%s",
+                Superstructure.slot0.IsthereBall(),
+                Superstructure.slot1.IsthereBall(),
+                Superstructure.slot2.IsthereBall());
+        telemetry.addData("revolver empty", revolverEmpty);
+        telemetry.addData("revolver", "%.1f -> %.1f",
+                Revolver.getRevolverAngle().getDegrees(),
+                Revolver.RevolverController.getTargetPosition());
+    }
+
     private void drawOnDashboard() {
         try {
             // Pose geçmişini çiz
