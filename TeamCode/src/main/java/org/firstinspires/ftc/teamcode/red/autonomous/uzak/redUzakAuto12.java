@@ -26,6 +26,12 @@ public class redUzakAuto12 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 2800.0;
     private static final double HUMAN_WAIT_TIME = 1.0; // Human'da bekleme süresi
+    private static final double CM_TO_INCHES = 1.0 / 2.54;
+    private static final double SCORE_POSE_Y_OFFSET_INCHES = 5.0 * CM_TO_INCHES;
+    private static final double RED_UZAK_SHOT_RPM_MULTIPLIER = 0.95;
+    private static final double RED_UZAK_HOOD_OFFSET_DEG = 2.0;
+    private static final double APRILTAG_SEARCH_TURRET_ANGLE_DEG = 55.0;
+    private static final double SHOT_EXIT_WAIT_SECONDS = 0.50;
     TelemetryManager telemetryM;
     private Follower follower;
     private int pathState;
@@ -37,15 +43,15 @@ public class redUzakAuto12 extends OpMode {
 
     // PATH POZISYONLARI
     private final Pose startPose = new Pose(87.700, 8.800, Math.toRadians(0));
-    private final Pose score1Pose = new Pose(87.700, 18.000, Math.toRadians(0));
+    private final Pose score1Pose = new Pose(87.700, 18.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose humanPose = new Pose(131.000, 8.800, Math.toRadians(0));
-    private final Pose score2Pose = new Pose(84.000, 25.000, Math.toRadians(0));
+    private final Pose score2Pose = new Pose(84.000, 25.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose GPPPoseBehind = new Pose(102.000, 35.000, Math.toRadians(0));
     private final Pose GPPPose = new Pose(132.000, 35.000, Math.toRadians(0));
-    private final Pose score3Pose = new Pose(84.000, 25.500, Math.toRadians(0));
+    private final Pose score3Pose = new Pose(84.000, 25.500 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose PGPPoseBehind = new Pose(102.000, 58.000, Math.toRadians(0));
     private final Pose PGPPose = new Pose(132.000, 58.000, Math.toRadians(0));
-    private final Pose score4Pose = new Pose(83.000, 70.000, Math.toRadians(0));
+    private final Pose score4Pose = new Pose(83.000, 70.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose parkPose = new Pose(83.000, 64.000, Math.toRadians(0));
 
     // PATHLER (DÜZELTİLMİŞ)
@@ -142,7 +148,7 @@ public class redUzakAuto12 extends OpMode {
 
             case 2:
                 // İlk shoot (score1)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(RED_UZAK_SHOT_RPM_MULTIPLIER, RED_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     Superstructure.stopShooting();
@@ -194,7 +200,7 @@ public class redUzakAuto12 extends OpMode {
 
             case 7:
                 // İkinci shoot (score2)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(RED_UZAK_SHOT_RPM_MULTIPLIER, RED_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     Superstructure.stopShooting();
@@ -247,7 +253,7 @@ public class redUzakAuto12 extends OpMode {
 
             case 12:
                 // Üçüncü shoot (score3)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(RED_UZAK_SHOT_RPM_MULTIPLIER, RED_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     Superstructure.stopShooting();
@@ -300,7 +306,7 @@ public class redUzakAuto12 extends OpMode {
 
             case 17:
                 // Dördüncü shoot (score4) - SON SHOOT!
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(RED_UZAK_SHOT_RPM_MULTIPLIER, RED_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     // Dördüncü shoot bitti, sistemleri kapat
@@ -345,7 +351,7 @@ public class redUzakAuto12 extends OpMode {
         opmodeTimer.resetTimer();
 
         // Debouncer oluştur - 0.5 saniye, Rising edge
-        revolverEmptyDebouncer = new Debouncer(0.15, Debouncer.DebounceType.kRising);
+        revolverEmptyDebouncer = new Debouncer(SHOT_EXIT_WAIT_SECONDS, Debouncer.DebounceType.kRising);
 
         follower = Constants.createFollower(hardwareMap);
         Superstructure.isauto=true;
@@ -382,6 +388,7 @@ public class redUzakAuto12 extends OpMode {
         follower.update();
 
         Superstructure.read();
+        pointTurretTowardAprilTagSearch();
         Superstructure.periodic();
         Superstructure.write();
         Superstructure.isRevolverReady();
@@ -395,6 +402,19 @@ public class redUzakAuto12 extends OpMode {
         telemetryM.debug("State", pathState);
         telemetryM.debug("Saved for TeleOp", PoseStorage.getSavedPose());
         telemetryM.update();
+    }
+
+    private void pointTurretTowardAprilTagSearch() {
+        if (isAprilTagSearchState()) {
+            Superstructure.pointTurretTowardAprilTagSearch(APRILTAG_SEARCH_TURRET_ANGLE_DEG);
+        }
+    }
+
+    private boolean isAprilTagSearchState() {
+        return pathState == 0 || pathState == 1 || pathState == 2
+                || pathState == 5 || pathState == 6 || pathState == 7
+                || pathState == 10 || pathState == 11 || pathState == 12
+                || pathState == 15 || pathState == 16 || pathState == 17;
     }
 
     private void drawOnDashboard() {

@@ -28,6 +28,7 @@ public class Vision extends WSubsystem {
     Pose2d TargetCamera = new Pose2d();
     public int ApriltagID = NO_FIDUCIAL_ID_FILTER;
     private int targetFiducialId = NO_FIDUCIAL_ID_FILTER;
+    private double targetDistanceInches = Double.NaN;
     LinearFilter filter;
 
     public void setTargetFiducialId(int fiducialId) {
@@ -62,6 +63,7 @@ public class Vision extends WSubsystem {
         this.results=LL3.getLatestResult();
         this.tv = false;
         this.ApriltagID = NO_FIDUCIAL_ID_FILTER;
+        this.targetDistanceInches = Double.NaN;
 
         if(results!=null){
             this.tl =results.getTargetingLatency()/100;
@@ -84,6 +86,14 @@ public class Vision extends WSubsystem {
 
                     Pose3D TargetPoseCamera = tag.getTargetPoseCameraSpace();
                     if (TargetPoseCamera != null) {
+                        double targetXInches = TargetPoseCamera.getPosition().toUnit(DistanceUnit.INCH).x;
+                        double targetYInches = TargetPoseCamera.getPosition().toUnit(DistanceUnit.INCH).y;
+                        double targetZInches = TargetPoseCamera.getPosition().toUnit(DistanceUnit.INCH).z;
+                        targetDistanceInches = Math.sqrt(
+                                targetXInches * targetXInches
+                                        + targetYInches * targetYInches
+                                        + targetZInches * targetZInches
+                        );
                         TargetCamera = new Pose2d(
                                 new Translation2d(
                                         TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).x,
@@ -97,6 +107,10 @@ public class Vision extends WSubsystem {
         }
     }
 
+    public double getTargetDistanceInches() {
+        return targetDistanceInches;
+    }
+
     @Override
     public void write() {}
 
@@ -105,6 +119,7 @@ public class Vision extends WSubsystem {
         tv = false;
         ApriltagID = NO_FIDUCIAL_ID_FILTER;
         targetFiducialId = NO_FIDUCIAL_ID_FILTER;
+        targetDistanceInches = Double.NaN;
     }
 
     private LLResultTypes.FiducialResult getTargetFiducial(LLResult result) {

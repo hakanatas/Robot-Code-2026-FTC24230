@@ -25,6 +25,12 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class redUzakAuto6 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 3700.0;
+    private static final double CM_TO_INCHES = 1.0 / 2.54;
+    private static final double SCORE_POSE_Y_OFFSET_INCHES = 5.0 * CM_TO_INCHES;
+    private static final double RED_UZAK_SHOT_RPM_MULTIPLIER = 0.95;
+    private static final double RED_UZAK_HOOD_OFFSET_DEG = 2.0;
+    private static final double APRILTAG_SEARCH_TURRET_ANGLE_DEG = 55.0;
+    private static final double SHOT_EXIT_WAIT_SECONDS = 0.50;
     TelemetryManager telemetryM;
     private Follower follower;
     private int pathState;
@@ -36,10 +42,10 @@ public class redUzakAuto6 extends OpMode {
 
     // PATH POZISYONLARI
     private final Pose startPose = new Pose(89.200, 8.600, Math.toRadians(0));
-    private final Pose score1Pose = new Pose(82.500, 27.500, Math.toRadians(0));
+    private final Pose score1Pose = new Pose(82.500, 27.500 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose GPPPoseBehind = new Pose(102.000, 35.000, Math.toRadians(0));
     private final Pose GPPPose = new Pose(132.000, 35.000, Math.toRadians(0));
-    private final Pose score2Pose = new Pose(85.000, 27.500, Math.toRadians(0));
+    private final Pose score2Pose = new Pose(85.000, 27.500 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose parkPose = new Pose(87.000, 40.000, Math.toRadians(0));
 
     // PATHLER
@@ -92,7 +98,7 @@ public class redUzakAuto6 extends OpMode {
 
             case 2:
                 // İlk shoot (score1)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(RED_UZAK_SHOT_RPM_MULTIPLIER, RED_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     Superstructure.stopShooting();
@@ -137,7 +143,7 @@ public class redUzakAuto6 extends OpMode {
 
             case 7:
                 // İkinci shoot (score2'de)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(RED_UZAK_SHOT_RPM_MULTIPLIER, RED_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     // İkinci shoot bitti, sistemleri kapat
@@ -182,7 +188,7 @@ public class redUzakAuto6 extends OpMode {
         opmodeTimer.resetTimer();
 
         // Debouncer oluştur - 0.5 saniye, Rising edge
-        revolverEmptyDebouncer = new Debouncer(0.3, Debouncer.DebounceType.kRising);
+        revolverEmptyDebouncer = new Debouncer(SHOT_EXIT_WAIT_SECONDS, Debouncer.DebounceType.kRising);
 
         follower = Constants.createFollower(hardwareMap);
         Superstructure.isauto=true;
@@ -219,6 +225,7 @@ public class redUzakAuto6 extends OpMode {
         follower.update();
 
         Superstructure.read();
+        pointTurretTowardAprilTagSearch();
         Superstructure.periodic();
         Superstructure.write();
         Superstructure.isRevolverReady();
@@ -259,6 +266,17 @@ public class redUzakAuto6 extends OpMode {
             telemetry.addData("Drawing Error", e.getMessage());
         }
     }
+    private void pointTurretTowardAprilTagSearch() {
+        if (isAprilTagSearchState()) {
+            Superstructure.pointTurretTowardAprilTagSearch(APRILTAG_SEARCH_TURRET_ANGLE_DEG);
+        }
+    }
+
+    private boolean isAprilTagSearchState() {
+        return pathState == 0 || pathState == 1 || pathState == 2
+                || pathState == 5 || pathState == 6 || pathState == 7;
+    }
+
     private void drawRobot(Pose pose, Style style) {
         if (pose == null || Double.isNaN(pose.getX()) ||
                 Double.isNaN(pose.getY()) || Double.isNaN(pose.getHeading())) {

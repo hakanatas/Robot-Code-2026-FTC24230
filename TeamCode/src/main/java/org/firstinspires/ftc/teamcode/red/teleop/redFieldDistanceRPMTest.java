@@ -20,11 +20,12 @@ import org.firstinspires.ftc.teamcode.lib.joysticklib.TimeDelayedBoolean;
 import org.firstinspires.ftc.teamcode.lib.joysticklib.Toggle;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-@TeleOp(name = "KırmızıSahaYeniTeleop")
-public class KirmiziSahaYeniTeleop extends OpMode {
+@TeleOp(name = "redSahaUzakHizTest")
+public class redFieldDistanceRPMTest extends OpMode {
     private static final double ROBOT_RADIUS = 9;
-    private static final double SHOOTING_HOOD_UP_OFFSET_DEG = 5.0;
-    private static final double MAX_HOOD_TARGET_DEG = 32.0;
+    private static final double LONG_DISTANCE_THRESHOLD_INCHES = 70.0;
+    private static final double LONG_DISTANCE_SHOT_RPM_MULTIPLIER = 0.95;
+    private static final double LONG_DISTANCE_HOOD_OFFSET_DEG = 2.0;
     private Follower follower;
     private TelemetryManager telemetryM;
     private FieldManager panelsField;
@@ -32,10 +33,12 @@ public class KirmiziSahaYeniTeleop extends OpMode {
     private Style historyStyle;
     private Pose savedPose;
     private boolean poseLoaded = false;
+    private double shotDistanceInches = Double.NaN;
+    private double shotRpmMultiplier = 1.0;
+    private double shotHoodOffsetDeg = 0.0;
     public TimeDelayedBoolean manualModeTimer = new TimeDelayedBoolean();
     public Toggle manualModeTrigger = new Toggle(false);
     public Toggle tilterTrigger=new Toggle(false);
-    private boolean previousRevolverResetButton = false;
 
     @Override
     public void init() {
@@ -44,7 +47,6 @@ public class KirmiziSahaYeniTeleop extends OpMode {
         Superstructure.isauto=false;
         Superstructure.init(hardwareMap);
         Superstructure.reset();
-        Superstructure.resetRevolverWithSensors();
         Superstructure.vision.LL3.pipelineSwitch(1);
         Superstructure.tilter.setState(Tilter.tilterState.IDLE);
 
@@ -109,8 +111,11 @@ public class KirmiziSahaYeniTeleop extends OpMode {
         }
 
         if(gamepad1.right_bumper){
-            Superstructure.setShootSystem();
+            updateShotAdjustments();
+            Superstructure.setShootSystem(shotRpmMultiplier, shotHoodOffsetDeg);
         } else {
+            shotRpmMultiplier = 1.0;
+            shotHoodOffsetDeg = 0.0;
             Superstructure.stopShooting();
         }
 
@@ -140,12 +145,6 @@ public class KirmiziSahaYeniTeleop extends OpMode {
 
         Superstructure.setVoltage(hardwareMap.voltageSensor.iterator().next().getVoltage());
 
-        boolean revolverResetButton = gamepad1.cross;
-        if (revolverResetButton && !previousRevolverResetButton) {
-            Superstructure.resetRevolverWithSensors();
-        }
-        previousRevolverResetButton = revolverResetButton;
-
         Superstructure.isRevolverReady();
 
         drawOnDashboard();
@@ -161,27 +160,15 @@ public class KirmiziSahaYeniTeleop extends OpMode {
         telemetryM.debug("s2", Revolver.get2Status());
         telemetryM.debug("rv", Revolver.getRevolverAngle().getDegrees());
         telemetryM.debug("TY", Superstructure.vision.ty);
+        telemetryM.debug("Target distance in", shotDistanceInches);
+        telemetryM.debug("Shot RPM x", shotRpmMultiplier);
+        telemetryM.debug("Shot hood offset", shotHoodOffsetDeg);
         telemetryM.update();
 
         Superstructure.read();
         Superstructure.periodic();
-        applyLowerShotHoodOffset();
         Superstructure.write();
     }
-
-    private void applyLowerShotHoodOffset() {
-        if (!gamepad1.right_bumper || Superstructure.manualMode || Superstructure.manualHoodControl) {
-            return;
-        }
-
-        double adjustedTarget = Math.min(
-                Superstructure.hood.getTargetAngle() + SHOOTING_HOOD_UP_OFFSET_DEG,
-                MAX_HOOD_TARGET_DEG
-        );
-        Superstructure.hood.setHoodAngle(adjustedTarget);
-        Superstructure.hood.periodic();
-    }
-
     private void drawOnDashboard() {
         try {
             // Pose geçmişini çiz
@@ -196,6 +183,21 @@ public class KirmiziSahaYeniTeleop extends OpMode {
             telemetry.addData("Drawing Error", e.getMessage());
         }
     }
+
+    private void updateShotAdjustments() {
+        shotDistanceInches = Superstructure.vision.getTargetDistanceInches();
+        if (Superstructure.vision.tv
+                && !Double.isNaN(shotDistanceInches)
+                && shotDistanceInches > LONG_DISTANCE_THRESHOLD_INCHES) {
+            shotRpmMultiplier = LONG_DISTANCE_SHOT_RPM_MULTIPLIER;
+            shotHoodOffsetDeg = LONG_DISTANCE_HOOD_OFFSET_DEG;
+            return;
+        }
+
+        shotRpmMultiplier = 1.0;
+        shotHoodOffsetDeg = 0.0;
+    }
+
     private void drawRobot(Pose pose, Style style) {
         if (pose == null || Double.isNaN(pose.getX()) ||
                 Double.isNaN(pose.getY()) || Double.isNaN(pose.getHeading())) {

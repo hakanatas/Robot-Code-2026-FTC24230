@@ -28,13 +28,16 @@ public class redYakinAuto12GateV2 extends OpMode {
     private static final double FLYWHEEL_IDLE_RPM = 3000.0;
     private static final double FIRST_SHOT_TAG_SEARCH_TURRET_ANGLE_DEG = 45.0;
     private static final double SHOT_TURRET_OPEN_OFFSET_DEG = 1.5;
-    private static final double SECOND_PICKUP_SHOT_TURRET_OFFSET_DEG = SHOT_TURRET_OPEN_OFFSET_DEG - 7.0;
+    private static final double SECOND_PICKUP_SHOT_TURRET_OFFSET_DEG = SHOT_TURRET_OPEN_OFFSET_DEG - 3.0;
+    private static final double FINAL_SHOT_TURRET_OFFSET_DEG = SHOT_TURRET_OPEN_OFFSET_DEG - 3.0;
     private static final double FINAL_SHOT_MIN_ATTEMPT_SECONDS = 1.0;
-    private static final double GATE_RETURN_T_VALUE = 0.92;
+    private static final double GATE_RETURN_T_VALUE = 0.88;
     private static final double CM_TO_INCHES = 1.0 / 2.54;
     private static final double OTHER_PICKUP_RIGHT_OFFSET_INCHES = 4.0 * CM_TO_INCHES;
+    private static final double SCORE_POSE_LEFT_OFFSET_INCHES = 2.5 * CM_TO_INCHES;
+    private static final double SCORE_POSE_UP_OFFSET_INCHES = 2.5 * CM_TO_INCHES;
     private static final PathConstraints V2_DRIVE_PATH_CONSTRAINTS = new PathConstraints(
-            0.920,
+            1.000,
             0.20,
             0.25,
             0.015,
@@ -44,7 +47,7 @@ public class redYakinAuto12GateV2 extends OpMode {
             1.0
     );
     private static final PathConstraints V2_GATE_PATH_CONSTRAINTS = new PathConstraints(
-            0.900,
+            0.990,
             0.20,
             0.30,
             0.015,
@@ -65,17 +68,17 @@ public class redYakinAuto12GateV2 extends OpMode {
 
     // PATH POZISYONLARI
     private final Pose startPose = new Pose(117.700, 129.350, Math.toRadians(44));
-    private final Pose score1Pose = new Pose(96.000, 84.300, Math.toRadians(0));
+    private final Pose score1Pose = new Pose(96.000 - SCORE_POSE_LEFT_OFFSET_INCHES, 84.300 + SCORE_POSE_UP_OFFSET_INCHES, Math.toRadians(0));
     private final Pose PPGPose = new Pose(125.000, 84.300, Math.toRadians(0));
     private final Pose backPose = new Pose(117.000, 84.300, Math.toRadians(0));
     private final Pose gatePose = new Pose(126.000, 75.000, Math.toRadians(0));
-    private final Pose score2Pose = new Pose(97.000, 84.300, Math.toRadians(0));
+    private final Pose score2Pose = new Pose(97.000 - SCORE_POSE_LEFT_OFFSET_INCHES, 84.300 + SCORE_POSE_UP_OFFSET_INCHES, Math.toRadians(0));
     private final Pose PGPPoseBehind = new Pose(103.000, 61.000 - OTHER_PICKUP_RIGHT_OFFSET_INCHES, Math.toRadians(0));
     private final Pose PGPPose = new Pose(131.000, 61.000 - OTHER_PICKUP_RIGHT_OFFSET_INCHES, Math.toRadians(0));
-    private final Pose score3Pose = new Pose(83.000, 71.000, Math.toRadians(0));
+    private final Pose score3Pose = new Pose(83.000 - SCORE_POSE_LEFT_OFFSET_INCHES, 71.000 + SCORE_POSE_UP_OFFSET_INCHES, Math.toRadians(0));
     private final Pose GPPPoseBehind = new Pose(102.000, 38.000 - OTHER_PICKUP_RIGHT_OFFSET_INCHES, Math.toRadians(0));
     private final Pose GPPPose = new Pose(131.000, 38.000 - OTHER_PICKUP_RIGHT_OFFSET_INCHES, Math.toRadians(0));
-    private final Pose score4Pose = new Pose(83.000, 71.000, Math.toRadians(0));
+    private final Pose score4Pose = new Pose(83.000 - SCORE_POSE_LEFT_OFFSET_INCHES, 71.000 + SCORE_POSE_UP_OFFSET_INCHES, Math.toRadians(0));
     private final Pose parkPose = new Pose(83.000, 65.000, Math.toRadians(0));
 
     // PATHLER
@@ -517,6 +520,9 @@ public class redYakinAuto12GateV2 extends OpMode {
     private double getShotTurretOffsetDeg() {
         if (pathState == 13) {
             return SECOND_PICKUP_SHOT_TURRET_OFFSET_DEG;
+        }
+        if (pathState == 18) {
+            return FINAL_SHOT_TURRET_OFFSET_DEG;
         }
 
         return SHOT_TURRET_OPEN_OFFSET_DEG;
