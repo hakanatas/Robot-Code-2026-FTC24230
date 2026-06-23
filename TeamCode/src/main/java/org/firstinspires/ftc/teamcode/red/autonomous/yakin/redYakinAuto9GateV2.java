@@ -20,6 +20,7 @@ import org.firstinspires.ftc.teamcode.Subsystems.Revolver.Revolver;
 import org.firstinspires.ftc.teamcode.Subsystems.Superstructure;
 import org.firstinspires.ftc.teamcode.Subsystems.Tilter.Tilter;
 import org.firstinspires.ftc.teamcode.lib.Debouncer;
+import org.firstinspires.ftc.teamcode.lib.math.InterpolatingDouble;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import java.io.BufferedWriter;
@@ -28,18 +29,25 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Locale;
 
-@Autonomous(name = "7-red_Yakın_9")
-public class redYakinAuto9 extends OpMode {
+@Autonomous(name = "3-red_Yakin_Kapi_9_V2")
+public class redYakinAuto9GateV2 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 3000.0;
-    private static final String SHOT_LOG_FILE_NAME = "redYakinAuto9-shot-log.csv";
+    private static final double SHOT_TURRET_TOLERANCE_DEG = 3.0;
+    private static final double SHOT_SETTLE_SECONDS = 0.08;
+    private static final double PARK_SETTLE_SECONDS = 0.03;
+    private static final double VISION_GATE_TIMEOUT_SECONDS = 0.16;
+    private static final double REVOLVER_EMPTY_DEBOUNCE_SECONDS = 0.15;
+    private static final boolean ENABLE_SHOT_LOG = false;
+    private static final String SHOT_LOG_FILE_NAME = "redYakinAuto9GateV2-shot-log.csv";
+
     TelemetryManager telemetryM;
     private Follower follower;
     private int pathState;
     private FieldManager panelsField;
     private Style robotStyle;
     private Style pathStyle;
-    private Timer pathTimer, opmodeTimer;
+    private Timer pathTimer, opmodeTimer, shotBurstTimer;
     private Debouncer revolverEmptyDebouncer;
     private BufferedWriter shotLog;
     private File shotLogFile;
@@ -48,21 +56,25 @@ public class redYakinAuto9 extends OpMode {
     private boolean lastRevolverEmptyRaw = false;
     private boolean lastRevolverEmpty = false;
     private boolean lastRevolverFull = false;
+    private boolean shotBurstActive = false;
+    private double lockedFlywheelRPM = FLYWHEEL_IDLE_RPM;
+    private double lockedHoodAngle = 0.0;
+    private double lockedTurretAngle = 0.0;
 
-    // PATH POZISYONLARI
     private final Pose startPose = new Pose(117.700, 129.350, Math.toRadians(44));
     private final Pose score1Pose = new Pose(84.000, 84.300, Math.toRadians(0));
     private final Pose PPGPoseBehind = new Pose(102.000, 84.300, Math.toRadians(0));
     private final Pose PPGPose = new Pose(125.000, 84.300, Math.toRadians(0));
+    private final Pose backPose = new Pose(114.000, 84.000, Math.toRadians(0));
+    private final Pose gatePose = new Pose(126.000, 75.000, Math.toRadians(0));
     private final Pose score2Pose = new Pose(94.000, 84.300, Math.toRadians(0));
     private final Pose PGPPoseBehind = new Pose(103.000, 61.000, Math.toRadians(0));
     private final Pose PGPPose = new Pose(131.000, 61.000, Math.toRadians(0));
     private final Pose score3Pose = new Pose(83.000, 71.000, Math.toRadians(0));
     private final Pose parkPose = new Pose(82.500, 63.000, Math.toRadians(0));
 
-    // PATHLER
     private Path score1;
-    private PathChain PPGBehind, PPG, score2, PGPBehind, PGP, score3, park;
+    private PathChain PPGBehind, PPG, back, gate, score2, PGPBehind, PGP, score3, park;
 
     public void buildPaths() {
         score1 = new Path(new BezierLine(startPose, score1Pose));
@@ -78,9 +90,19 @@ public class redYakinAuto9 extends OpMode {
                 .setLinearHeadingInterpolation(PPGPoseBehind.getHeading(), PPGPose.getHeading())
                 .build();
 
+        back = follower.pathBuilder()
+                .addPath(new BezierLine(PPGPose, backPose))
+                .setLinearHeadingInterpolation(PPGPose.getHeading(), backPose.getHeading())
+                .build();
+
+        gate = follower.pathBuilder()
+                .addPath(new BezierLine(backPose, gatePose))
+                .setLinearHeadingInterpolation(backPose.getHeading(), gatePose.getHeading())
+                .build();
+
         score2 = follower.pathBuilder()
-                .addPath(new BezierLine(PPGPose, score2Pose))
-                .setLinearHeadingInterpolation(PPGPose.getHeading(), score2Pose.getHeading())
+                .addPath(new BezierLine(gatePose, score2Pose))
+                .setLinearHeadingInterpolation(gatePose.getHeading(), score2Pose.getHeading())
                 .build();
 
         PGPBehind = follower.pathBuilder()
@@ -105,40 +127,41 @@ public class redYakinAuto9 extends OpMode {
     }
 
     public void autonomousPathUpdate() {
-        boolean revolverEmptyRaw = !Superstructure.slot0.IsthereBall() && !Superstructure.slot2.IsthereBall() && !Superstructure.slot1.IsthereBall();
+        boolean revolverEmptyRaw = !Superstructure.slot0.IsthereBall()
+                && !Superstructure.slot2.IsthereBall()
+                && !Superstructure.slot1.IsthereBall();
         boolean revolverEmpty = revolverEmptyDebouncer.calculate(revolverEmptyRaw);
-        boolean revolverFull = Superstructure.slot0.IsthereBall() && Superstructure.slot2.IsthereBall() && Superstructure.slot1.IsthereBall();
+        boolean revolverFull = Superstructure.slot0.IsthereBall()
+                && Superstructure.slot2.IsthereBall()
+                && Superstructure.slot1.IsthereBall();
         lastRevolverEmptyRaw = revolverEmptyRaw;
         lastRevolverEmpty = revolverEmpty;
         lastRevolverFull = revolverFull;
 
         switch (pathState) {
             case 0:
-                // Başlangıç - score1'e git
                 follower.followPath(score1);
                 setPathState(1);
                 break;
 
             case 1:
-                // score1'e ulaşma bekleniyor
                 if (!follower.isBusy()) {
                     setPathState(2);
                 }
                 break;
 
             case 2:
-                // İlk shoot (score1)
-                Superstructure.setShootSystem();
+                runShotBurst();
 
                 if (revolverEmpty) {
-                    Superstructure.stopShooting();
+                    finishShotBurst();
                     follower.followPath(PPGBehind);
                     setPathState(3);
                 }
                 break;
 
             case 3:
-                Superstructure.setIntakeSystem(1); // ← Intake aç
+                Superstructure.setIntakeSystem(1);
 
                 if (!follower.isBusy()) {
                     follower.followPath(PPG);
@@ -150,7 +173,7 @@ public class redYakinAuto9 extends OpMode {
                 Superstructure.setIntakeSystem(1);
 
                 if (!follower.isBusy() || revolverFull) {
-                    follower.followPath(score2);
+                    follower.followPath(back);
                     setPathState(5);
                 }
                 break;
@@ -160,42 +183,36 @@ public class redYakinAuto9 extends OpMode {
 
                 if (!follower.isBusy()) {
                     Superstructure.setIntakeSystem(0);
+                    follower.followPath(gate);
                     setPathState(6);
                 }
                 break;
 
             case 6:
-                // Robot stabilize olsun
-                if (pathTimer.getElapsedTimeSeconds() > 0.2) {
+                if (!follower.isBusy()) {
+                    follower.followPath(score2);
                     setPathState(7);
                 }
                 break;
 
             case 7:
-                // İkinci shoot (score2)
-                Superstructure.setShootSystem();
-
-                if (revolverEmpty) {
-                    Superstructure.stopShooting();
-                    follower.followPath(PGPBehind);
+                if (!follower.isBusy()) {
                     setPathState(8);
                 }
                 break;
 
             case 8:
-                Superstructure.setIntakeSystem(1); // ← Intake aç
-
-                if (!follower.isBusy()) {
-                    follower.followPath(PGP);
+                if (pathTimer.getElapsedTimeSeconds() > SHOT_SETTLE_SECONDS) {
                     setPathState(9);
                 }
                 break;
 
             case 9:
-                Superstructure.setIntakeSystem(1);
+                runShotBurst();
 
-                if (!follower.isBusy() || revolverFull) {
-                    follower.followPath(score3);
+                if (revolverEmpty) {
+                    finishShotBurst();
+                    follower.followPath(PGPBehind);
                     setPathState(10);
                 }
                 break;
@@ -204,60 +221,69 @@ public class redYakinAuto9 extends OpMode {
                 Superstructure.setIntakeSystem(1);
 
                 if (!follower.isBusy()) {
-                    Superstructure.setIntakeSystem(0);
+                    follower.followPath(PGP);
                     setPathState(11);
                 }
                 break;
 
             case 11:
-                // Robot stabilize olsun
-                if (pathTimer.getElapsedTimeSeconds() > 0.2) {
+                Superstructure.setIntakeSystem(1);
+
+                if (!follower.isBusy() || revolverFull) {
+                    follower.followPath(score3);
                     setPathState(12);
                 }
                 break;
 
             case 12:
-                // Üçüncü shoot (score3)
-                Superstructure.setShootSystem();
+                Superstructure.setIntakeSystem(1);
+
+                if (!follower.isBusy()) {
+                    Superstructure.setIntakeSystem(0);
+                    setPathState(13);
+                }
+                break;
+
+            case 13:
+                if (pathTimer.getElapsedTimeSeconds() > SHOT_SETTLE_SECONDS) {
+                    setPathState(14);
+                }
+                break;
+
+            case 14:
+                runShotBurst();
 
                 if (revolverEmpty) {
-                    // Üçüncü shoot bitti, sistemleri kapat
-                    Superstructure.stopShooting();
+                    finishShotBurst();
                     Superstructure.setFlywheelIdleMode(false);
                     Superstructure.flywheel.setSetpointRPM(0);
                     Superstructure.manualHoodControl = true;
                     Superstructure.manualTurretControl = true;
                     Superstructure.turret.setTurretAngle(0.0);
                     Superstructure.hood.setHoodAngle(0.0);
-                    setPathState(13);
+                    setPathState(15);
                 }
                 break;
 
-            case 13:
-                // Hood'un kapanmasını bekle
+            case 15:
                 Superstructure.feeder.setFeedersMotor(0);
 
-                if (pathTimer.getElapsedTimeSeconds() > 0.2) {
-                    // Park'a HIZLI git
+                if (pathTimer.getElapsedTimeSeconds() > PARK_SETTLE_SECONDS) {
                     follower.followPath(park);
-                    setPathState(14);
+                    setPathState(16);
                 }
                 break;
 
-            case 14:
-                // Park pozisyonuna gidiliyor
-
-
+            case 16:
                 if (!follower.isBusy()) {
                     setPathState(-1);
                 }
                 break;
         }
 
-        // FLYWHEEL RÖLANTI SİSTEMİ
-        if (pathState != 2 && pathState != 7 && pathState != 12 && pathState != 13 && pathState != 14 && pathState != -1) {
-            Superstructure.flywheel.setSetpointRPM(FLYWHEEL_IDLE_RPM);
-            Superstructure.feeder.setFeedersMotor(0);
+        if (pathState != 2 && pathState != 9 && pathState != 14
+                && pathState != 15 && pathState != 16 && pathState != -1) {
+            keepShooterWarm();
         }
     }
 
@@ -265,15 +291,16 @@ public class redYakinAuto9 extends OpMode {
     public void init() {
         pathTimer = new Timer();
         opmodeTimer = new Timer();
+        shotBurstTimer = new Timer();
         opmodeTimer.resetTimer();
 
-        // Debouncer oluştur - 0.5 saniye, Rising edge
-        revolverEmptyDebouncer = new Debouncer(0.3, Debouncer.DebounceType.kRising);
+        revolverEmptyDebouncer = new Debouncer(REVOLVER_EMPTY_DEBOUNCE_SECONDS, Debouncer.DebounceType.kRising);
 
         follower = Constants.createFollower(hardwareMap);
-        Superstructure.isauto=true;
+        Superstructure.isauto = true;
         Superstructure.init(hardwareMap);
         Superstructure.reset();
+        Superstructure.flywheelIdleRPM = FLYWHEEL_IDLE_RPM;
         Superstructure.vision.LL3.pipelineSwitch(1);
         Superstructure.tilter.setState(Tilter.tilterState.IDLE);
 
@@ -287,19 +314,18 @@ public class redYakinAuto9 extends OpMode {
         pathStyle = new Style("", "#3F51B5", 0.75);
 
         follower.setStartingPose(startPose);
-
         buildPaths();
-
         PoseStorage.savePose(startPose);
     }
 
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        revolverEmptyDebouncer.reset(); // ← Debouncer'ı resetle!
+        revolverEmptyDebouncer.reset();
+        resetShotBurst();
         setPathState(0);
         logShotState("START");
-        telemetryM.debug("Autonomous started! 3-Shoot sequence");
+        telemetryM.debug("Autonomous started! 3-Shoot Gate V2 sequence");
     }
 
     @Override
@@ -315,14 +341,17 @@ public class redYakinAuto9 extends OpMode {
         logShotState("LOOP");
 
         drawOnDashboard();
-
         PoseStorage.savePose(follower.getPose());
 
         telemetryM.debug("State", pathState);
+        telemetryM.debug("Empty (Raw)", lastRevolverEmptyRaw);
+        telemetryM.debug("Empty (Debounced)", lastRevolverEmpty);
+        telemetryM.debug("Shot Burst", shotBurstActive);
         telemetryM.debug("Shot Log", shotLogStatus);
         telemetryM.debug("Saved for TeleOp", PoseStorage.getSavedPose());
         telemetryM.update();
     }
+
     private void drawOnDashboard() {
         try {
             if (follower.getCurrentPath() != null) {
@@ -341,14 +370,13 @@ public class redYakinAuto9 extends OpMode {
             }
 
             drawPoseHistory();
-
             drawRobot(follower.getPose(), robotStyle);
-
             panelsField.update();
         } catch (Exception e) {
             telemetry.addData("Drawing Error", e.getMessage());
         }
     }
+
     private void drawRobot(Pose pose, Style style) {
         if (pose == null || Double.isNaN(pose.getX()) ||
                 Double.isNaN(pose.getY()) || Double.isNaN(pose.getHeading())) {
@@ -370,6 +398,7 @@ public class redYakinAuto9 extends OpMode {
         panelsField.moveCursor(x1, y1);
         panelsField.line(x2, y2);
     }
+
     private void drawPath(Path path) {
         double[][] points = path.getPanelsDrawingPoints();
 
@@ -385,6 +414,7 @@ public class redYakinAuto9 extends OpMode {
         panelsField.moveCursor(points[0][0], points[0][1]);
         panelsField.line(points[1][0], points[1][1]);
     }
+
     private void drawPoseHistory() {
         Style historyStyle = new Style("", "#FF9800", 0.5);
         panelsField.setStyle(historyStyle);
@@ -398,6 +428,88 @@ public class redYakinAuto9 extends OpMode {
         }
     }
 
+    private void runShotBurst() {
+        if (!shotBurstActive) {
+            Superstructure.setShootSystem();
+            if (isLiveShotGateReady()) {
+                beginShotBurst();
+            }
+            return;
+        }
+
+        holdLockedShotTargets();
+        Superstructure.feeder.setFeedersMotor(isLockedShotGateReady() ? 1.0 : 0.0);
+    }
+
+    private void beginShotBurst() {
+        shotBurstActive = true;
+        shotBurstTimer.resetTimer();
+
+        lockedFlywheelRPM = Superstructure.flywheel.getTargetRPM();
+        lockedHoodAngle = Superstructure.hood.getTargetAngle();
+        lockedTurretAngle = Superstructure.turret.TurretController.getTargetPosition();
+
+        Superstructure.manualHoodControl = true;
+        Superstructure.manualTurretControl = true;
+        holdLockedShotTargets();
+        Superstructure.feeder.setFeedersMotor(1.0);
+        logShotState("SHOT_BURST_START");
+    }
+
+    private void finishShotBurst() {
+        Superstructure.stopShooting();
+        resetShotBurst();
+        logShotState("SHOT_BURST_FINISH");
+    }
+
+    private void resetShotBurst() {
+        shotBurstActive = false;
+        Superstructure.manualHoodControl = false;
+        Superstructure.manualTurretControl = false;
+    }
+
+    private void holdLockedShotTargets() {
+        Superstructure.flywheel.setSetpointRPM(lockedFlywheelRPM);
+        Superstructure.hood.setHoodAngle(lockedHoodAngle);
+        Superstructure.turret.setTurretAngle(lockedTurretAngle);
+    }
+
+    private void keepShooterWarm() {
+        double warmupRPM = FLYWHEEL_IDLE_RPM;
+        if (Superstructure.vision.tv) {
+            warmupRPM = org.firstinspires.ftc.teamcode.lib.Constants.ShootingParams.kRPMMap
+                    .getInterpolated(new InterpolatingDouble(Superstructure.vision.ty)).value;
+        }
+
+        Superstructure.flywheelIdleRPM = warmupRPM;
+        Superstructure.flywheel.setSetpointRPM(warmupRPM);
+        Superstructure.feeder.setFeedersMotor(0);
+    }
+
+    private boolean isLiveShotGateReady() {
+        return Superstructure.flywheel.IsAtSetpoint()
+                && Superstructure.hood.IsAtSetpoint()
+                && isVisionReadyForShot()
+                && isTurretReady();
+    }
+
+    private boolean isLockedShotGateReady() {
+        return Superstructure.flywheel.IsAtSetpoint()
+                && Superstructure.hood.IsAtSetpoint()
+                && isTurretReady();
+    }
+
+    private boolean isTurretReady() {
+        double turretError = Superstructure.turret.TurretController.getTargetPosition()
+                - Superstructure.turret.getTurretAngle();
+        return Math.abs(turretError) <= SHOT_TURRET_TOLERANCE_DEG;
+    }
+
+    private boolean isVisionReadyForShot() {
+        return Superstructure.vision.tv
+                || (pathTimer != null && pathTimer.getElapsedTimeSeconds() > VISION_GATE_TIMEOUT_SECONDS);
+    }
+
     public void setPathState(int pState) {
         pathState = pState;
         pathTimer.resetTimer();
@@ -409,6 +521,7 @@ public class redYakinAuto9 extends OpMode {
     public void stop() {
         logShotState("STOP");
         closeShotLog();
+        resetShotBurst();
         telemetryM.debug("Autonomous stopped!");
         Superstructure.setFlywheelIdleMode(false);
         Superstructure.manualHoodControl = true;
@@ -420,6 +533,11 @@ public class redYakinAuto9 extends OpMode {
     }
 
     private void initShotLog() {
+        if (!ENABLE_SHOT_LOG) {
+            shotLogStatus = "disabled";
+            return;
+        }
+
         try {
             File logDir = hardwareMap.appContext.getFilesDir();
             if (!logDir.exists() && !logDir.mkdirs()) {
@@ -429,7 +547,7 @@ public class redYakinAuto9 extends OpMode {
 
             shotLogFile = new File(logDir, SHOT_LOG_FILE_NAME);
             shotLog = new BufferedWriter(new FileWriter(shotLogFile, false));
-            shotLog.write("time_s,state,event,pathTime_s,followerBusy,visionTv,tagId,tx,ty,flywheelRpm,flywheelTargetRpm,flywheelReady,hoodAngle,hoodTarget,hoodReady,turretAngle,turretTarget,turretError,turretReady,shotGate,feederPower,intakePower,slot0,slot1,slot2,currentSlotHasBall,revolverEmptyRaw,revolverEmptyDebounced,revolverFull,revolverAngle,revolverTarget,sensor0,sensor1,sensor2,intakeSensor,poseX,poseY,poseHeadingDeg\n");
+            shotLog.write("time_s,state,event,pathTime_s,followerBusy,visionTv,tagId,tx,ty,flywheelRpm,flywheelTargetRpm,flywheelReady,hoodAngle,hoodTarget,hoodReady,turretAngle,turretTarget,turretError,turretReady,shotGate,shotBurstActive,lockedShotGate,lockedFlywheelRpm,lockedHoodTarget,lockedTurretTarget,feederPower,intakePower,slot0,slot1,slot2,currentSlotHasBall,revolverEmptyRaw,revolverEmptyDebounced,revolverFull,revolverAngle,revolverTarget,sensor0,sensor1,sensor2,intakeSensor,poseX,poseY,poseHeadingDeg\n");
             shotLog.flush();
             shotLogStatus = shotLogFile.getAbsolutePath();
         } catch (IOException e) {
@@ -458,11 +576,12 @@ public class redYakinAuto9 extends OpMode {
             double turretAngle = Superstructure.turret.getTurretAngle();
             double turretTarget = Superstructure.turret.TurretController.getTargetPosition();
             double turretError = turretTarget - turretAngle;
-            boolean turretReady = Math.abs(turretError) <= 3.0;
-            boolean shotGate = flywheelReady && hoodReady && Superstructure.vision.tv && turretReady;
+            boolean turretReady = Math.abs(turretError) <= SHOT_TURRET_TOLERANCE_DEG;
+            boolean shotGate = flywheelReady && hoodReady && isVisionReadyForShot() && turretReady;
+            boolean lockedShotGate = shotBurstActive && isLockedShotGateReady();
 
             shotLog.write(String.format(Locale.US,
-                    "%.3f,%d,%s,%.3f,%b,%b,%d,%.3f,%.3f,%.1f,%.1f,%b,%.2f,%.2f,%b,%.2f,%.2f,%.2f,%b,%b,%.2f,%.2f,%b,%b,%b,%b,%b,%b,%b,%.2f,%.2f,%b,%b,%b,%b,%.2f,%.2f,%.2f%n",
+                    "%.3f,%d,%s,%.3f,%b,%b,%d,%.3f,%.3f,%.1f,%.1f,%b,%.2f,%.2f,%b,%.2f,%.2f,%.2f,%b,%b,%b,%b,%.1f,%.2f,%.2f,%.2f,%.2f,%b,%b,%b,%b,%b,%b,%b,%.2f,%.2f,%b,%b,%b,%b,%.2f,%.2f,%.2f%n",
                     time,
                     pathState,
                     event,
@@ -483,6 +602,11 @@ public class redYakinAuto9 extends OpMode {
                     turretError,
                     turretReady,
                     shotGate,
+                    shotBurstActive,
+                    lockedShotGate,
+                    lockedFlywheelRPM,
+                    lockedHoodAngle,
+                    lockedTurretAngle,
                     Superstructure.feeder.getPower(),
                     Superstructure.intake.getPower(),
                     Superstructure.slot0.IsthereBall(),

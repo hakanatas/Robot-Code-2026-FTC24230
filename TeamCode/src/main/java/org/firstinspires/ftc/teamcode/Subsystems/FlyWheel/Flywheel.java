@@ -46,6 +46,9 @@ public class Flywheel extends WSubsystem {
     public double getShooterRPM(){
         return VelocityController.getVelocity();
     }
+    public double getTargetRPM(){
+        return VelocityController.getTargetVelocity();
+    }
     @Override
     public void periodic() {
 //        VelocityController.setFeedforwardSimple(ks,kv,0.0);

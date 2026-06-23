@@ -42,6 +42,9 @@ public class Hood extends WSubsystem {
     public double getHoodAngle(){
         return axonController.getTotalRotation();
     }
+    public double getTargetAngle(){
+        return axonController.getTargetRotation();
+    }
 
     @Override
     public void periodic() {

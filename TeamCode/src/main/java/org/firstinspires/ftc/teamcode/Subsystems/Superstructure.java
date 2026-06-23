@@ -367,6 +367,33 @@ public class Superstructure{
         return currentSlot.IsthereBall();
     }
 
+    public static void resetRevolverWithSensors() {
+        revolver.zeroToCurrentPosition();
+
+        boolean shooterHasBall = Revolver.get2Status();
+        boolean rightHasBall = Revolver.get0Status();
+        boolean leftHasBall = Revolver.get1Status();
+
+        slot0.setIsthereBall(shooterHasBall);
+        slot1.setIsthereBall(rightHasBall);
+        slot2.setIsthereBall(leftHasBall);
+        currentSlot = slot0;
+
+        if (shooterHasBall) {
+            revAngle = slot0.getAngle();
+        } else if (rightHasBall && leftHasBall) {
+            revAngle = slot2.getAngle();
+        } else if (rightHasBall) {
+            revAngle = slot1.getAngle();
+        } else if (leftHasBall) {
+            revAngle = slot2.getAngle();
+        } else {
+            revAngle = slot0.getAngle();
+        }
+
+        Revolver.setRevolverAngle(revAngle);
+    }
+
     public static void setShootSystem(){
         isShooting = true;
         if(!manualMode){

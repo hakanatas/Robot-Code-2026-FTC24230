@@ -107,6 +107,14 @@ public class Revolver extends WSubsystem {
     public static void setRevolverAngle(double angle){
         RevolverController.setTargetPosition(angle);
     }
+    public void zeroToCurrentPosition(){
+        if (RevolverEncoder != null) {
+            RevolverEncoder.encoder.reset();
+        }
+        if (RevolverController != null) {
+            RevolverController.setTargetPosition(0.0);
+        }
+    }
     public void setVoltage(DoubleSupplier voltage){
         RevolverController.setVoltageSupplier(voltage);
     }

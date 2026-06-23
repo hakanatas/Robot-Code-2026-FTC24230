@@ -30,6 +30,9 @@ public class Feeder extends WSubsystem {
         blFeederMotor.setPower(speed);
         brFeederMotor.setPower(speed);
     }
+    public double getPower(){
+        return lFeederMotor.getPower();
+    }
     @Override
     public void periodic() {}
 

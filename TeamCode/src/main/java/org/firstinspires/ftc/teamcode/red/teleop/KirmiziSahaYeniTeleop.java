@@ -1,6 +1,5 @@
-package org.firstinspires.ftc.teamcode.blue.teleop;
+package org.firstinspires.ftc.teamcode.red.teleop;
 
-import com.acmerobotics.dashboard.FtcDashboard;
 import com.bylazar.field.FieldManager;
 import com.bylazar.field.PanelsField;
 import com.bylazar.field.Style;
@@ -21,10 +20,11 @@ import org.firstinspires.ftc.teamcode.lib.joysticklib.TimeDelayedBoolean;
 import org.firstinspires.ftc.teamcode.lib.joysticklib.Toggle;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-@TeleOp(name = "maviSaha")
-public class blueField extends OpMode {
-    static FtcDashboard dashboard;
+@TeleOp(name = "KırmızıSahaYeniTeleop")
+public class KirmiziSahaYeniTeleop extends OpMode {
     private static final double ROBOT_RADIUS = 9;
+    private static final double SHOOTING_HOOD_UP_OFFSET_DEG = 5.0;
+    private static final double MAX_HOOD_TARGET_DEG = 32.0;
     private Follower follower;
     private TelemetryManager telemetryM;
     private FieldManager panelsField;
@@ -35,6 +35,7 @@ public class blueField extends OpMode {
     public TimeDelayedBoolean manualModeTimer = new TimeDelayedBoolean();
     public Toggle manualModeTrigger = new Toggle(false);
     public Toggle tilterTrigger=new Toggle(false);
+    private boolean previousRevolverResetButton = false;
 
     @Override
     public void init() {
@@ -43,9 +44,10 @@ public class blueField extends OpMode {
         Superstructure.isauto=false;
         Superstructure.init(hardwareMap);
         Superstructure.reset();
-        Superstructure.vision.LL3.pipelineSwitch(0);
-        Superstructure.vision.setTargetFiducialId(20);
+        Superstructure.resetRevolverWithSensors();
+        Superstructure.vision.LL3.pipelineSwitch(1);
         Superstructure.tilter.setState(Tilter.tilterState.IDLE);
+
         savedPose = PoseStorage.getSavedPose();
         follower.setStartingPose(savedPose);
 
@@ -55,9 +57,6 @@ public class blueField extends OpMode {
 
         panelsField = PanelsField.INSTANCE.getField();
         panelsField.setOffsets(PanelsField.INSTANCE.getPresets().getPEDRO_PATHING());
-
-//        dashboard = FtcDashboard.getInstance();
-//        telemetry = dashboard.getTelemetry();
 
         robotStyle = new Style("", "#4CAF50", 0.75);      // Yeşil - Robot
         historyStyle = new Style("", "#FF9800", 0.5);    // Turuncu - Geçmiş
@@ -90,8 +89,8 @@ public class blueField extends OpMode {
         follower.update();
 
         follower.setTeleOpDrive(
-                0.85 * gamepad1.left_stick_y,
-                0.85 * gamepad1.left_stick_x,
+                0.85 * -gamepad1.left_stick_y,
+                0.85 * -gamepad1.left_stick_x,
                 0.5 * -gamepad1.right_stick_x,
                 false
         );
@@ -102,7 +101,6 @@ public class blueField extends OpMode {
         }else{
             if(gamepad1.triangle){
                 Superstructure.isIntakwing=true;
-
                 Superstructure.setIntakeSystem(-1);
             } else{
                 Superstructure.isIntakwing=false;
@@ -140,7 +138,14 @@ public class blueField extends OpMode {
             Superstructure.isTilted=false;
         }
 
-        Superstructure.angularvel=follower.getAngularVelocity();
+        Superstructure.setVoltage(hardwareMap.voltageSensor.iterator().next().getVoltage());
+
+        boolean revolverResetButton = gamepad1.cross;
+        if (revolverResetButton && !previousRevolverResetButton) {
+            Superstructure.resetRevolverWithSensors();
+        }
+        previousRevolverResetButton = revolverResetButton;
+
         Superstructure.isRevolverReady();
 
         drawOnDashboard();
@@ -150,42 +155,33 @@ public class blueField extends OpMode {
             PoseStorage.reset();
         }
 
-        Superstructure.setVoltage(hardwareMap.voltageSensor.iterator().next().getVoltage());
-
-        /*
- Telemetry
-        telemetry.addData("revangle",Superstructure.revolangle);
-        telemetry.addData("REVOLVER", MathUtil.inputModulus(Revolver.getRevolverAngle().getDegrees(),-180,180));
-        telemetry.addData("target",Revolver.RevolverController.getTargetPosition());
-        telemetry.addData("intakepower",Superstructure.intake.getPower());
-        telemetry.addData("s0", Revolver.get0Status());
-        telemetry.addData("s1", Revolver.get1Status());
-        telemetry.addData("s2", Revolver.get2Status());
-        telemetry.addData("s3", Revolver.getIntakeStatus());
-        telemetry.addData("slot0", Superstructure.slot0.IsthereBall());
-        telemetry.addData("slot1", Superstructure.slot1.IsthereBall());
-        telemetry.addData("slot2", Superstructure.slot2.IsthereBall());
-        telemetry.addData("turetpos",Superstructure.turret.getTurretAngle());
-        telemetry.addData("Target RPM",Superstructure.flywheel.getShooterRPM());
-        telemetry.addData("Hood Angle", Superstructure.hood.getHoodAngle());
-*/
+        // Telemetry
         telemetryM.debug("s0", Revolver.get0Status());
         telemetryM.debug("s1", Revolver.get1Status());
         telemetryM.debug("s2", Revolver.get2Status());
-
         telemetryM.debug("rv", Revolver.getRevolverAngle().getDegrees());
-        telemetryM.debug("Tag Filter", Superstructure.vision.getTargetFiducialId());
-        telemetryM.debug("Tag ID", Superstructure.vision.ApriltagID);
-        telemetryM.debug("TV", Superstructure.vision.tv);
-        telemetryM.debug("TX", Superstructure.vision.tx);
         telemetryM.debug("TY", Superstructure.vision.ty);
-
         telemetryM.update();
 
         Superstructure.read();
         Superstructure.periodic();
+        applyLowerShotHoodOffset();
         Superstructure.write();
     }
+
+    private void applyLowerShotHoodOffset() {
+        if (!gamepad1.right_bumper || Superstructure.manualMode || Superstructure.manualHoodControl) {
+            return;
+        }
+
+        double adjustedTarget = Math.min(
+                Superstructure.hood.getTargetAngle() + SHOOTING_HOOD_UP_OFFSET_DEG,
+                MAX_HOOD_TARGET_DEG
+        );
+        Superstructure.hood.setHoodAngle(adjustedTarget);
+        Superstructure.hood.periodic();
+    }
+
     private void drawOnDashboard() {
         try {
             // Pose geçmişini çiz

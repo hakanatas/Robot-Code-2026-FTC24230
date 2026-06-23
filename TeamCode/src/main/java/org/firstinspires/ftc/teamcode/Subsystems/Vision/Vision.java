@@ -11,11 +11,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.lib.math.LinearFilter;
 import org.firstinspires.ftc.teamcode.wrappers.WSubsystem;
 
+import java.util.List;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 
 public class Vision extends WSubsystem {
+    public static final int NO_FIDUCIAL_ID_FILTER = -1;
     public Limelight3A LL3;
     public double tx;
     public double ty;
@@ -23,8 +26,21 @@ public class Vision extends WSubsystem {
     public double tl;
     LLResult results;
     Pose2d TargetCamera = new Pose2d();
-    int ApriltagID;
+    public int ApriltagID = NO_FIDUCIAL_ID_FILTER;
+    private int targetFiducialId = NO_FIDUCIAL_ID_FILTER;
     LinearFilter filter;
+
+    public void setTargetFiducialId(int fiducialId) {
+        targetFiducialId = fiducialId;
+    }
+
+    public void clearTargetFiducialId() {
+        targetFiducialId = NO_FIDUCIAL_ID_FILTER;
+    }
+
+    public int getTargetFiducialId() {
+        return targetFiducialId;
+    }
 
     @Override
     public void init(HardwareMap hardwareMap) {
@@ -44,16 +60,38 @@ public class Vision extends WSubsystem {
     @Override
     public void read() {
         this.results=LL3.getLatestResult();
+        this.tv = false;
+        this.ApriltagID = NO_FIDUCIAL_ID_FILTER;
+
         if(results!=null){
-            this.tx=results.getTx();
-            this.ty= results.getTy();
-            this.tv =results.isValid();
             this.tl =results.getTargetingLatency()/100;
-            if(this.tv){
-                LLResultTypes.FiducialResult tag =results.getFiducialResults().get(0);
-                if(tag.getFiducialId()==20){
-                    Pose3D TargetPoseCamera =tag.getTargetPoseCameraSpace();
-                    TargetCamera = new Pose2d(new Translation2d(TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).x, TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).y),new Rotation2d(TargetPoseCamera.getOrientation().getYaw(AngleUnit.RADIANS)));
+            if(results.isValid()){
+                if (targetFiducialId == NO_FIDUCIAL_ID_FILTER) {
+                    this.tx = results.getTx();
+                    this.ty = results.getTy();
+                    this.tv = true;
+                }
+
+                LLResultTypes.FiducialResult tag = getTargetFiducial(results);
+
+                if (tag != null) {
+                    if (targetFiducialId != NO_FIDUCIAL_ID_FILTER) {
+                        this.tx = tag.getTargetXDegrees();
+                        this.ty = tag.getTargetYDegrees();
+                    }
+                    this.tv = true;
+                    this.ApriltagID = tag.getFiducialId();
+
+                    Pose3D TargetPoseCamera = tag.getTargetPoseCameraSpace();
+                    if (TargetPoseCamera != null) {
+                        TargetCamera = new Pose2d(
+                                new Translation2d(
+                                        TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).x,
+                                        TargetPoseCamera.getPosition().toUnit(DistanceUnit.METER).y
+                                ),
+                                new Rotation2d(TargetPoseCamera.getOrientation().getYaw(AngleUnit.RADIANS))
+                        );
+                    }
                 }
             }
         }
@@ -63,5 +101,28 @@ public class Vision extends WSubsystem {
     public void write() {}
 
     @Override
-    public void reset() {}
+    public void reset() {
+        tv = false;
+        ApriltagID = NO_FIDUCIAL_ID_FILTER;
+        targetFiducialId = NO_FIDUCIAL_ID_FILTER;
+    }
+
+    private LLResultTypes.FiducialResult getTargetFiducial(LLResult result) {
+        List<LLResultTypes.FiducialResult> tags = result.getFiducialResults();
+        if (tags == null || tags.isEmpty()) {
+            return null;
+        }
+
+        if (targetFiducialId == NO_FIDUCIAL_ID_FILTER) {
+            return tags.get(0);
+        }
+
+        for (LLResultTypes.FiducialResult tag : tags) {
+            if (tag.getFiducialId() == targetFiducialId) {
+                return tag;
+            }
+        }
+
+        return null;
+    }
 }
