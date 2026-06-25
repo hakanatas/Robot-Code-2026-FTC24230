@@ -75,6 +75,7 @@ public class Superstructure{
 
     public static boolean isauto = false;
     public static double angularvel = 0;
+    public static double turretAimDeadbandDeg = 0.0;
     public static PIDController visionpid = new PIDController(0.8,0,0);
     public static Slot slot0=new Slot(0);
     public static Slot slot1=new Slot(120);
@@ -115,7 +116,8 @@ public class Superstructure{
         }
 
         if(!manualMode&&!manualTurretControl){
-            double compensatetx = visionpid.calculate(vision.tx,0);
+            double aimTx = Math.abs(vision.tx) < turretAimDeadbandDeg ? 0.0 : vision.tx;
+            double compensatetx = visionpid.calculate(aimTx,0);
             double error;
             if (vision.tv) {
                 if(angularvel>0){
@@ -508,5 +510,6 @@ public class Superstructure{
         isShooting = false;
         autoWiggle = false;
         shootingHoodOffsetDeg = 0.0;
+        turretAimDeadbandDeg = 0.0;
     }
 }

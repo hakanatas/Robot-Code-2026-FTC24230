@@ -31,6 +31,7 @@ public class redUzakAuto6 extends OpMode {
     private static final double RED_UZAK_HOOD_OFFSET_DEG = 2.0;
     private static final double APRILTAG_SEARCH_TURRET_ANGLE_DEG = 55.0;
     private static final double SHOT_EXIT_WAIT_SECONDS = 0.50;
+    private static final double FORCE_PARK_TIME_SECONDS = 29.0;
     TelemetryManager telemetryM;
     private Follower follower;
     private int pathState;
@@ -81,6 +82,13 @@ public class redUzakAuto6 extends OpMode {
         boolean revolverEmptyRaw = !Superstructure.slot0.IsthereBall() && !Superstructure.slot2.IsthereBall() && !Superstructure.slot1.IsthereBall();
         boolean revolverEmpty = revolverEmptyDebouncer.calculate(revolverEmptyRaw);
         boolean revolverFull = Superstructure.slot0.IsthereBall() && Superstructure.slot2.IsthereBall() && Superstructure.slot1.IsthereBall();
+
+        if (opmodeTimer.getElapsedTimeSeconds() >= FORCE_PARK_TIME_SECONDS
+                && pathState != 9
+                && pathState != -1) {
+            forcePark();
+            return;
+        }
 
         switch (pathState) {
             case 0:
@@ -330,6 +338,21 @@ public class redUzakAuto6 extends OpMode {
         pathState = pState;
         pathTimer.resetTimer();
         telemetryM.debug("Path state changed to: " + pState);
+    }
+
+    private void forcePark() {
+        Superstructure.stopShooting();
+        Superstructure.setFlywheelIdleMode(false);
+        Superstructure.flywheel.setSetpointRPM(0);
+        Superstructure.manualHoodControl = true;
+        Superstructure.manualTurretControl = true;
+        Superstructure.turret.setTurretAngle(0.0);
+        Superstructure.hood.setHoodAngle(0.0);
+        Superstructure.setIntakeSystem(0);
+        Superstructure.feeder.setFeedersMotor(0);
+        follower.followPath(park);
+        setPathState(9);
+        telemetryM.debug("Force park", opmodeTimer.getElapsedTimeSeconds());
     }
 
     @Override

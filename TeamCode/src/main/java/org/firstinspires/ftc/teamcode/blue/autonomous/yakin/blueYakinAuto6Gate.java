@@ -25,6 +25,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class blueYakinAuto6Gate extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 3000.0;
+    private static final double FORCE_STOP_TIME_SECONDS = 29.0;
     TelemetryManager telemetryM;
     private Follower follower;
     private int pathState;
@@ -81,6 +82,12 @@ public class blueYakinAuto6Gate extends OpMode {
         boolean revolverEmptyRaw = !Superstructure.slot0.IsthereBall() && !Superstructure.slot2.IsthereBall() && !Superstructure.slot1.IsthereBall();
         boolean revolverEmpty = revolverEmptyDebouncer.calculate(revolverEmptyRaw);
         boolean revolverFull = Superstructure.slot0.IsthereBall() && Superstructure.slot2.IsthereBall() && Superstructure.slot1.IsthereBall();
+
+        if (opmodeTimer.getElapsedTimeSeconds() >= FORCE_STOP_TIME_SECONDS
+                && pathState != -1) {
+            forceStop();
+            return;
+        }
 
         switch (pathState) {
             case 0:
@@ -335,6 +342,20 @@ public class blueYakinAuto6Gate extends OpMode {
         pathState = pState;
         pathTimer.resetTimer();
         telemetryM.debug("Path state changed to: " + pState);
+    }
+
+    private void forceStop() {
+        Superstructure.stopShooting();
+        Superstructure.setFlywheelIdleMode(false);
+        Superstructure.flywheel.setSetpointRPM(0);
+        Superstructure.manualHoodControl = true;
+        Superstructure.manualTurretControl = true;
+        Superstructure.turret.setTurretAngle(0.0);
+        Superstructure.hood.setHoodAngle(0.0);
+        Superstructure.setIntakeSystem(0);
+        Superstructure.feeder.setFeedersMotor(0);
+        setPathState(-1);
+        telemetryM.debug("Force stop", opmodeTimer.getElapsedTimeSeconds());
     }
 
     @Override

@@ -25,6 +25,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class blueUzakAuto6 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 3700.0;
+    private static final double FORCE_PARK_TIME_SECONDS = 29.0;
     TelemetryManager telemetryM;
     private Follower follower;
     private int pathState;
@@ -74,6 +75,13 @@ public class blueUzakAuto6 extends OpMode {
         boolean revolverEmptyRaw = !Superstructure.slot0.IsthereBall() && !Superstructure.slot2.IsthereBall() && !Superstructure.slot1.IsthereBall();
         boolean revolverEmpty = revolverEmptyDebouncer.calculate(revolverEmptyRaw);
         boolean revolverFull = Superstructure.slot0.IsthereBall() && Superstructure.slot2.IsthereBall() && Superstructure.slot1.IsthereBall();
+
+        if (opmodeTimer.getElapsedTimeSeconds() >= FORCE_PARK_TIME_SECONDS
+                && pathState != 9
+                && pathState != -1) {
+            forcePark();
+            return;
+        }
 
         switch (pathState) {
             case 0:
@@ -314,6 +322,21 @@ public class blueUzakAuto6 extends OpMode {
         pathState = pState;
         pathTimer.resetTimer();
         telemetryM.debug("Path state changed to: " + pState);
+    }
+
+    private void forcePark() {
+        Superstructure.stopShooting();
+        Superstructure.setFlywheelIdleMode(false);
+        Superstructure.flywheel.setSetpointRPM(0);
+        Superstructure.manualHoodControl = true;
+        Superstructure.manualTurretControl = true;
+        Superstructure.turret.setTurretAngle(0.0);
+        Superstructure.hood.setHoodAngle(0.0);
+        Superstructure.setIntakeSystem(0);
+        Superstructure.feeder.setFeedersMotor(0);
+        follower.followPath(park);
+        setPathState(9);
+        telemetryM.debug("Force park", opmodeTimer.getElapsedTimeSeconds());
     }
 
     @Override

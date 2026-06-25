@@ -32,6 +32,7 @@ import java.util.Locale;
 public class redYakinAuto9 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 3000.0;
+    private static final double FORCE_PARK_TIME_SECONDS = 29.0;
     private static final String SHOT_LOG_FILE_NAME = "redYakinAuto9-shot-log.csv";
     TelemetryManager telemetryM;
     private Follower follower;
@@ -111,6 +112,13 @@ public class redYakinAuto9 extends OpMode {
         lastRevolverEmptyRaw = revolverEmptyRaw;
         lastRevolverEmpty = revolverEmpty;
         lastRevolverFull = revolverFull;
+
+        if (opmodeTimer.getElapsedTimeSeconds() >= FORCE_PARK_TIME_SECONDS
+                && pathState != 14
+                && pathState != -1) {
+            forcePark();
+            return;
+        }
 
         switch (pathState) {
             case 0:
@@ -403,6 +411,21 @@ public class redYakinAuto9 extends OpMode {
         pathTimer.resetTimer();
         telemetryM.debug("Path state changed to: " + pState);
         logShotState("STATE_" + pState);
+    }
+
+    private void forcePark() {
+        Superstructure.stopShooting();
+        Superstructure.setFlywheelIdleMode(false);
+        Superstructure.flywheel.setSetpointRPM(0);
+        Superstructure.manualHoodControl = true;
+        Superstructure.manualTurretControl = true;
+        Superstructure.turret.setTurretAngle(0.0);
+        Superstructure.hood.setHoodAngle(0.0);
+        Superstructure.setIntakeSystem(0);
+        Superstructure.feeder.setFeedersMotor(0);
+        follower.followPath(park);
+        setPathState(14);
+        telemetryM.debug("Force park", opmodeTimer.getElapsedTimeSeconds());
     }
 
     @Override
