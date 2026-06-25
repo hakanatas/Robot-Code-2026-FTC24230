@@ -45,7 +45,7 @@ public class blueYakinAuto9Gate extends OpMode {
     private final Pose score2Pose = new Pose(50.000, 84.300, Math.toRadians(180));
     private final Pose PGPPoseBehind = new Pose(41.000, 61.000, Math.toRadians(180));
     private final Pose PGPPose = new Pose(13.000, 61.000, Math.toRadians(180));
-    private final Pose score3Pose = new Pose(61.000, 71.000, Math.toRadians(180));
+    private final Pose score3Pose = new Pose(61.000, 73.500, Math.toRadians(180));
     private final Pose parkPose = new Pose(61.500, 63.000, Math.toRadians(180));
 
     // PATHLER

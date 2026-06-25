@@ -25,6 +25,10 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class blueUzakAuto6 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
     private static final double FLYWHEEL_IDLE_RPM = 3700.0;
+    private static final double BLUE_UZAK_SHOT_RPM_MULTIPLIER = 0.95;
+    private static final double BLUE_UZAK_HOOD_OFFSET_DEG = 2.0;
+    private static final double APRILTAG_SEARCH_TURRET_ANGLE_DEG = 55.0;
+    private static final double SHOT_EXIT_WAIT_SECONDS = 0.50;
     private static final double FORCE_PARK_TIME_SECONDS = 29.0;
     TelemetryManager telemetryM;
     private Follower follower;
@@ -99,7 +103,7 @@ public class blueUzakAuto6 extends OpMode {
 
             case 2:
                 // İlk shoot (score1)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(BLUE_UZAK_SHOT_RPM_MULTIPLIER, BLUE_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     Superstructure.stopShooting();
@@ -147,7 +151,7 @@ public class blueUzakAuto6 extends OpMode {
 
             case 7:
                 // İkinci shoot (score2'de)
-                Superstructure.setShootSystem();
+                Superstructure.setShootSystem(BLUE_UZAK_SHOT_RPM_MULTIPLIER, BLUE_UZAK_HOOD_OFFSET_DEG);
 
                 if (revolverEmpty) {
                     // İkinci shoot bitti, sistemleri kapat
@@ -192,7 +196,7 @@ public class blueUzakAuto6 extends OpMode {
         opmodeTimer.resetTimer();
 
         // Debouncer oluştur - 0.5 saniye, Rising edge
-        revolverEmptyDebouncer = new Debouncer(0.3, Debouncer.DebounceType.kRising);
+        revolverEmptyDebouncer = new Debouncer(SHOT_EXIT_WAIT_SECONDS, Debouncer.DebounceType.kRising);
 
         follower = Constants.createFollower(hardwareMap);
         Superstructure.isauto=true;

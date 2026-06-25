@@ -45,12 +45,12 @@ public class redUzakAutoHuman9_3 extends OpMode {
     private final Pose startPose = new Pose(87.700, 8.800, Math.toRadians(0));
     private final Pose score1Pose = new Pose(87.700, 18.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose humanPose = new Pose(131.000, 8.800, Math.toRadians(0));
-    private final Pose score2Pose = new Pose(84.000, 26.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
+    private final Pose score2Pose = new Pose(83.500, 24.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose GPPPoseBehind = new Pose(102.000, 35.000, Math.toRadians(0));
     private final Pose GPPPose = new Pose(132.000, 35.000, Math.toRadians(0));
-    private final Pose score3Pose = new Pose(84.000, 27.500 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
+    private final Pose score3Pose = new Pose(83.500, 24.500 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose human2Pose = new Pose(131.000, 11.000, Math.toRadians(0));
-    private final Pose score4Pose = new Pose(83.000, 26.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
+    private final Pose score4Pose = new Pose(83.000, 24.000 - SCORE_POSE_Y_OFFSET_INCHES, Math.toRadians(0));
     private final Pose parkPose = new Pose(89.000, 26.000, Math.toRadians(0));
 
     // PATHLER

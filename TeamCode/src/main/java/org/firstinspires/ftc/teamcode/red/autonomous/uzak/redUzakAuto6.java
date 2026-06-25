@@ -13,6 +13,7 @@ import com.pedropathing.paths.Path;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.PoseStorage;
@@ -20,7 +21,7 @@ import org.firstinspires.ftc.teamcode.Subsystems.Superstructure;
 import org.firstinspires.ftc.teamcode.Subsystems.Tilter.Tilter;
 import org.firstinspires.ftc.teamcode.lib.Debouncer;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-
+@Disabled
 @Autonomous(name = "6-red_Uzak_6")
 public class redUzakAuto6 extends OpMode {
     private static final double ROBOT_RADIUS = 9;
